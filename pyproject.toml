@@ -1,0 +1,14 @@
+[project]
+name = "comfyui-h3-storydirector"
+description = "MiniMax H3 导演工作台：分镜时间线 + 运动上下文链接的增量式长视频生成"
+version = "0.1.0"
+license = {text = "Apache-2.0"}
+dependencies = []
+
+[project.urls]
+Repository = "https://github.com/TBD/ComfyUI-H3-StoryDirector"
+
+[tool.comfy]
+PublisherId = ""
+DisplayName = "ComfyUI-H3-StoryDirector"
+Icon = ""
