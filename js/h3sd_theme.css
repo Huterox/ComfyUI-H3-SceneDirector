@@ -250,3 +250,72 @@
 .h3sd-pe-preview-btns button:hover { background: #2b3040; }
 .h3sd-pe-preview-btns .h3sd-btn-primary { background: #2e6fd8; border-color: #2e6fd8; color: #fff; }
 .h3sd-pe-preview-btns .danger { color: #ff9d9d; }
+
+/* 片段胶片带（我们的时间轴） */
+.h3sd-filmstrip {
+    background: var(--screen, #0c0e13);
+    border: 1px solid #262b38;
+    border-radius: 6px;
+    margin-top: 6px;
+    padding: 4px 6px 6px;
+}
+.h3sd-fs-ruler {
+    position: relative;
+    height: 14px;
+    border-bottom: 1px solid #262b38;
+    margin-bottom: 4px;
+}
+.h3sd-fs-tick {
+    position: absolute;
+    top: 0;
+    font-size: 9px;
+    color: #8b91a3;
+    font-variant-numeric: tabular-nums;
+}
+.h3sd-fs-track {
+    display: flex;
+    gap: 3px;
+    height: 64px;
+}
+.h3sd-fs-cell {
+    position: relative;
+    height: 100%;
+    background: #14161c;
+    border: 1px solid #262b38;
+    border-radius: 4px;
+    overflow: hidden;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+}
+.h3sd-fs-cell img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+.h3sd-fs-cell.sel { border-color: #4da3ff; box-shadow: 0 0 0 1px #4da3ff; }
+.h3sd-fs-cell.playable:hover { border-color: #3a4265; }
+.h3sd-fs-empty { color: #4a5164; font-size: 18px; }
+.h3sd-fs-dot {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #4a5164;
+}
+.h3sd-fs-dot.ok { background: #35b8a3; }
+.h3sd-fs-dot.warn { background: #ffd27f; }
+.h3sd-fs-idx {
+    position: absolute;
+    left: 4px;
+    bottom: 2px;
+    font-size: 10px;
+    color: #cfd3dd;
+    text-shadow: 0 1px 2px #000;
+}
+.h3sd-fs-rebuild { color: #9fd3ff !important; }
