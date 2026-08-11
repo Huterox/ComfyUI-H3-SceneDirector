@@ -16,6 +16,10 @@ const DEFAULT_API_FORMAT = "Ollama";
 const API_OLLAMA = "Ollama";
 const API_ZHIPU = "智谱 GLM";
 const API_OPENAI_COMPAT = "OpenAI Compatible";
+// SceneDirector 适配：Anthropic /v1/messages
+const API_ANTHROPIC = "Anthropic";
+const DEFAULT_ANTHROPIC_URL = "https://api.anthropic.com";
+const DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-5";
 const OPENAI_COMPAT_STANDARD = "标准";
 const OPENAI_COMPAT_LLAMA_SWAP = "llama-swap";
 const DEFAULT_OUTPUT_LANGUAGE = "中文";
@@ -45,21 +49,25 @@ function coerceLlmModel(value) {
 
 function normalizeApiFormat(fmt) {
     if (fmt === LEGACY_OPENAI_FORMAT) return API_OPENAI_COMPAT;
-    if (fmt === API_ZHIPU || fmt === API_OLLAMA || fmt === API_OPENAI_COMPAT) return fmt;
+    if (fmt === API_ZHIPU || fmt === API_OLLAMA || fmt === API_OPENAI_COMPAT
+        || fmt === API_ANTHROPIC) return fmt;
     return DEFAULT_API_FORMAT;
 }
 
 function inferApiFormat(url, explicit) {
     const fmt = normalizeApiFormat(explicit);
-    if (fmt === API_ZHIPU || fmt === API_OLLAMA || fmt === API_OPENAI_COMPAT) return fmt;
+    if (fmt === API_ZHIPU || fmt === API_OLLAMA || fmt === API_OPENAI_COMPAT
+        || fmt === API_ANTHROPIC) return fmt;
     const u = coerceLlmUrl(url);
     if (/bigmodel\.cn/i.test(u)) return API_ZHIPU;
+    if (/anthropic\.com/i.test(u)) return API_ANTHROPIC;
     return DEFAULT_API_FORMAT;
 }
 
 function defaultsForApiFormat(fmt) {
     if (fmt === API_ZHIPU) return { url: DEFAULT_ZHIPU_URL, model: DEFAULT_ZHIPU_MODEL };
     if (fmt === API_OPENAI_COMPAT) return { url: DEFAULT_OPENAI_COMPAT_URL, model: DEFAULT_LLM_MODEL };
+    if (fmt === API_ANTHROPIC) return { url: DEFAULT_ANTHROPIC_URL, model: DEFAULT_ANTHROPIC_MODEL };
     return { url: "http://127.0.0.1:11434", model: DEFAULT_LLM_MODEL };
 }
 
@@ -230,6 +238,7 @@ export function mountPromptEnhancerPanel(editor, parentEl) {
         [API_OLLAMA, "Ollama (/api/chat)"],
         [API_ZHIPU, "智谱 GLM (/paas/v4/chat)"],
         [API_OPENAI_COMPAT, "OpenAI Compatible (/v1/chat/completions)"],
+        [API_ANTHROPIC, "Anthropic (/v1/messages)"],
     ]) {
         const o = document.createElement("option");
         o.value = val; o.textContent = label;

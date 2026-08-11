@@ -38,11 +38,6 @@ class H3SceneDirectorList:
             "required": {
                 "task_type": (_TASK_OPTIONS, {"default": _TASK_OPTIONS[0]}),
                 "global_prompt": ("STRING", {"default": "", "multiline": True}),
-                "bd_grp_sample": ("BDGROUP", {"default": "采样设置"}),
-                "cfg": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 30.0, "step": 0.01}),
-                "seed": ("INT", {"default": 0, "min": 0,
-                                 "max": 0xffffffffffffffff,
-                                 "control_after_generate": True}),
                 "frame_rate": ("FLOAT", {"default": 24.0, "min": 1.0, "max": 240.0,
                                          "step": 0.01}),
                 "width": ("INT", {"default": 864, "min": 32, "max": 8192, "step": 32}),
@@ -51,9 +46,6 @@ class H3SceneDirectorList:
                                          "step": 32}),
                 "total_frames": ("INT", {"default": 124, "min": 5, "max": 100000}),
                 "timeline_data": ("STRING", {"default": "", "multiline": True}),
-                "bd_grp_perf": ("BDGROUP", {"default": "性能"}),
-                "clear_vram_between_segments": ("BOOLEAN", {"default": True}),
-                "export_source_images": ("BOOLEAN", {"default": False}),
                 # 本包自有：缓存目录名（output/h3_scenedirector/ 下）
                 "run_name": ("STRING", {"default": "story"}),
             },
@@ -66,10 +58,8 @@ class H3SceneDirectorList:
     DESCRIPTION = ("导演工作台：分镜时间线（Director UI）→ 载荷，"
                    "输出给编码头和链条。")
 
-    def make_list(self, task_type, global_prompt, bd_grp_sample, cfg, seed,
-                  frame_rate, width, height, ref_max_size, total_frames,
-                  timeline_data, bd_grp_perf, clear_vram_between_segments,
-                  export_source_images, run_name):
+    def make_list(self, task_type, global_prompt, frame_rate, width, height,
+                  ref_max_size, total_frames, timeline_data, run_name):
         gp, assets, segs, options = P.parse_director(
             timeline_data, task_type, global_prompt, P.sanitize_run(run_name))
         if not segs:
@@ -87,8 +77,6 @@ class H3SceneDirectorList:
             payload["context_length"] = options["context_length"]
         if options.get("audio_mode") is not None:
             payload["audio_mode"] = options["audio_mode"]
-        # List 上的 cfg/seed 是 Director UI 兼容件（已隐藏）：采样配置以
-        # Chain 的 widget 与接线为准，这里不写进载荷
         return (json.dumps(payload, ensure_ascii=False),)
 
 

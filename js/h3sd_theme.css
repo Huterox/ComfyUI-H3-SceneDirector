@@ -1,0 +1,165 @@
+/* SceneDirector 主题：我们自己的工作台视觉（覆盖在 Director 交互层之上）
+   配色与舞台/进度条样式对齐我们先前的设计。*/
+
+:root {
+    --h3sd-bg: #14161c;
+    --h3sd-panel: #1a1d26;
+    --h3sd-panel2: #1d2029;
+    --h3sd-line: #262b38;
+    --h3sd-line2: #3a4265;
+    --h3sd-text: #cfd3dd;
+    --h3sd-dim: #8b91a3;
+    --h3sd-accent: #4da3ff;
+    --h3sd-live: #9fd3ff;
+    --h3sd-ok: #35b8a3;
+    --h3sd-warn: #ffd27f;
+    --h3sd-bad: #ff9d9d;
+}
+
+/* 总容器 */
+.bd-wrap {
+    background: var(--h3sd-bg);
+    color: var(--h3sd-text);
+    border-radius: 8px;
+    font-size: 12px;
+}
+
+/* 工具条 */
+.bd-toolbar .bd-btn, .bd-toolbar .bd-select, .bd-toolbar .bd-num,
+.bd-output .bd-btn, .bd-output .bd-select, .bd-output .bd-num {
+    background: var(--h3sd-panel2);
+    color: var(--h3sd-text);
+    border: 1px solid var(--h3sd-line2);
+    border-radius: 4px;
+    font-size: 12px;
+}
+.bd-toolbar .bd-btn:hover, .bd-output .bd-btn:hover { background: #2b3040; }
+.bd-toolbar .bd-btn-primary {
+    background: #2e6fd8;
+    border-color: #2e6fd8;
+    color: #fff;
+}
+.bd-toolbar .bd-btn-primary:hover { background: #3b7fe8; }
+.bd-toolbar .bd-btn-danger { color: var(--h3sd-bad); }
+.bd-toolbar .bd-mode button.active {
+    background: #2e6fd8;
+    border-color: #2e6fd8;
+    color: #fff;
+}
+.bd-video-tag { color: var(--h3sd-dim); }
+
+/* 舞台（视频/预览区）：我们的大屏风格 */
+.bd-stage {
+    background: #0c0e13;
+    border: 1px solid var(--h3sd-line);
+    border-radius: 8px;
+    overflow: hidden;
+}
+.bd-stage-empty { color: #4a5164; font-size: 13px; }
+.bd-stage-badge {
+    background: rgba(10, 12, 18, .75);
+    color: var(--h3sd-live);
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 11px;
+}
+
+/* 实时采样预览：我们的大屏 + 青色标签风格 */
+.bd-live-sample {
+    background: #0c0e13;
+    border: 1px solid var(--h3sd-line);
+    border-radius: 8px;
+    overflow: hidden;
+}
+.bd-live-sample-head {
+    background: var(--h3sd-panel);
+    padding: 5px 10px;
+    color: var(--h3sd-dim);
+    font-size: 11px;
+}
+.bd-live-sample-head b { color: var(--h3sd-live); font-weight: 600; }
+.bd-live-sample-body img {
+    display: block;
+    margin: 0 auto;
+    max-height: 420px;
+    object-fit: contain;
+}
+.bd-live-sample-empty { color: #4a5164; padding: 18px 0; text-align: center; }
+.bd-live-sample-badge {
+    background: rgba(10, 12, 18, .75);
+    color: var(--h3sd-live);
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 11px;
+}
+
+/* 输出条 */
+.bd-output { border-top: 1px solid var(--h3sd-line); }
+.bd-output .bd-btn-live-preview.active {
+    background: #1e4636;
+    border-color: var(--h3sd-ok);
+    color: #7fe0b2;
+}
+
+/* 底部面板（全局提示词/分段编辑） */
+.bd-panel, .mmx-batch-panel, .mmx-fl2v-panel {
+    background: var(--h3sd-panel);
+    border: 1px solid var(--h3sd-line);
+    border-radius: 8px;
+}
+.bd-panel b, .bd-seg-head b { color: #9fb2d8; }
+.bd-prompt, .bd-select, .bd-num, .bd-refs input {
+    background: var(--h3sd-panel2) !important;
+    color: var(--h3sd-text) !important;
+    border: 1px solid var(--h3sd-line) !important;
+    border-radius: 4px;
+}
+.bd-label { color: var(--h3sd-dim); }
+.bd-gen-src {
+    border: 1px dashed var(--h3sd-line2) !important;
+    border-radius: 6px !important;
+    background: #0c0e13 !important;
+    color: #4a5164 !important;
+}
+.bd-gen-src:hover { border-color: var(--h3sd-accent) !important; }
+
+/* 时间轴画布区 */
+.bd-viewport {
+    background: #0c0e13;
+    border: 1px solid var(--h3sd-line);
+    border-radius: 8px;
+}
+
+/* 批量卡/片段卡 */
+.mmx-batch-card, .bd-shot-card, .mmx-fl2v-shot {
+    background: var(--h3sd-panel);
+    border: 1px solid var(--h3sd-line) !important;
+    border-radius: 8px !important;
+}
+.mmx-batch-card.sel, .bd-shot-card.sel { border-color: var(--h3sd-accent) !important; }
+
+/* 进度（运行状态）：我们的渐变条 */
+.bd-run-status {
+    background: var(--h3sd-panel);
+    border: 1px solid var(--h3sd-line);
+    border-radius: 8px;
+}
+.bd-run-status .bd-bar, .bd-run-status progress {
+    accent-color: #2e6fd8;
+}
+.bd-run-status .bd-bar > div,
+.bd-run-status [class*="fill"] {
+    background: linear-gradient(90deg, #2e6fd8, #35b8a3) !important;
+}
+
+/* 增强面板 */
+.minimax-pe-select, .minimax-pe-url, .minimax-pe-model, .minimax-pe-key {
+    background: var(--h3sd-panel2) !important;
+    color: var(--h3sd-text) !important;
+    border: 1px solid var(--h3sd-line) !important;
+}
+
+/* 滚动条 */
+.bd-wrap ::-webkit-scrollbar { width: 8px; height: 8px; }
+.bd-wrap ::-webkit-scrollbar-thumb { background: #2c3140; border-radius: 4px; }
+.bd-wrap ::-webkit-scrollbar-track { background: transparent; }

@@ -254,12 +254,14 @@ async def enhance(request):
             str(body.get("prompt", "") or ""),
             task=P._task_key_from_label(body.get("task_type") or body.get("task") or "t2v"),
             duration=float(body.get("duration", 5.0) or 5.0),
-            api_url=str(body.get("api_url", "") or prompt_enhance.DEFAULT_OLLAMA_URL),
+            api_url=str(body.get("llm_url", "") or body.get("api_url", "")
+                        or prompt_enhance.DEFAULT_OLLAMA_URL),
             model=str(body.get("model", "") or prompt_enhance.DEFAULT_MODEL),
-            api_key=str(body.get("api_key", "") or ""))
+            api_key=str(body.get("api_key", "") or ""),
+            api_format=str(body.get("api_format", "") or ""))
     except Exception as exc:
-        return web.Response(status=400, text=str(exc))
-    return web.json_response({"enhanced": text, "prompt": text})
+        return web.json_response({"error": str(exc)}, status=400)
+    return web.json_response({"response": text})
 
 
 @PromptServer.instance.routes.post("/minimax/director/unload_model")
