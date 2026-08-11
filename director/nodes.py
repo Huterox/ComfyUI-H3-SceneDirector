@@ -71,18 +71,17 @@ class H3SceneDirectorList:
 
     def make_list(self, task_type, global_prompt, frame_rate, width, height,
                   ref_max_size, total_frames, timeline_data, run_name, **_llm):
-        # 唯一载荷格式：自研工作台写的本包 schema（见 payload.py 头部）
-        run, run_nonce, gp, globals_rows, assets, segs = P.parse_payload(timeline_data)
-        options = P.parse_run_options(timeline_data)
+        gp, assets, segs, options = P.parse_director(
+            timeline_data, task_type, global_prompt, P.sanitize_run(run_name))
         if not segs:
             # UI 还没写时间线时给一段空白 t2v，避免空载荷报错
             segs = [{"duration": max(1.0, round(total_frames / max(1.0, frame_rate), 2)),
                      "prompt": "", "nonce": "", "assets": [], "enabled": True,
                      "first_frame": None, "last_frame": None, "source": None,
                      "audio_mode": "generate", "task": P._task_key_from_label(task_type)}]
-        payload = {"run": P.sanitize_run(run_name), "run_nonce": run_nonce,
-                   "global_prompt": gp, "globals": globals_rows,
-                   "assets": assets, "segments": segs}
+        payload = {"run": P.sanitize_run(run_name), "run_nonce": 0,
+                   "global_prompt": gp, "globals": [], "assets": assets,
+                   "segments": segs}
         if options.get("continuity") is not None:
             payload["continuity"] = options["continuity"]
         if options.get("context_length") is not None:

@@ -1,0 +1,321 @@
+/* SceneDirector 主题 v2：完整对齐我们先前的工作台视觉语言。
+   设计 token 与组件样式从旧 workbench 移植，只覆盖视觉、不动交互。*/
+
+:root {
+    --bg: #14161c;
+    --panel: #1a1d26;
+    --panel2: #1d2029;
+    --screen: #0c0e13;
+    --line: #262b38;
+    --line2: #3a4265;
+    --text: #cfd3dd;
+    --dim: #8b91a3;
+    --dimmer: #4a5164;
+    --accent: #4da3ff;
+    --accent2: #2e6fd8;
+    --live: #9fd3ff;
+    --ok-bg: #1e4636; --ok: #7fe0b2;
+    --warn-bg: #4d3a17; --warn: #ffd27f;
+    --bad-bg: #4d1f24; --bad: #ff9d9d;
+    --radius: 6px;
+}
+
+/* ============ 总容器与排版 ============ */
+.bd-wrap {
+    background: var(--bg);
+    color: var(--text);
+    border-radius: 8px;
+    font-size: 12px;
+    line-height: 1.45;
+}
+.bd-wrap ::-webkit-scrollbar { width: 8px; height: 8px; }
+.bd-wrap ::-webkit-scrollbar-thumb { background: #2c3140; border-radius: 4px; }
+.bd-wrap ::-webkit-scrollbar-track { background: transparent; }
+
+/* ============ 工具条（我们的深色胶囊风格） ============ */
+.bd-toolbar { gap: 4px; }
+.bd-toolbar .bd-btn, .bd-toolbar .bd-select, .bd-toolbar .bd-num,
+.bd-output .bd-btn, .bd-output .bd-select, .bd-output .bd-num,
+.bd-split-edit-bar .bd-btn {
+    background: #232733;
+    color: var(--text);
+    border: 1px solid #333a4d;
+    border-radius: 4px;
+    font-size: 12px;
+    padding: 3px 10px;
+}
+.bd-toolbar .bd-btn:hover, .bd-output .bd-btn:hover { background: #2b3040; }
+.bd-toolbar .bd-btn:disabled { opacity: .45; }
+.bd-toolbar .bd-btn-primary {
+    background: var(--accent2);
+    border-color: var(--accent2);
+    color: #fff;
+}
+.bd-toolbar .bd-btn-primary:hover { background: #3b7fe8; }
+.bd-toolbar .bd-btn-danger { color: var(--bad); border-color: #5a2b31; }
+.bd-toolbar .bd-mode { border: 1px solid #333a4d; border-radius: 4px; overflow: hidden; }
+.bd-toolbar .bd-mode button { border: none; border-radius: 0; background: #232733; color: var(--dim); }
+.bd-toolbar .bd-mode button.active { background: var(--accent2); color: #fff; }
+.bd-video-tag { color: var(--dim); }
+.bd-timecode, .bd-bounds { color: var(--dim); font-variant-numeric: tabular-nums; }
+
+/* ============ 舞台与大屏（我们旧舞台的样子） ============ */
+.bd-stage, .bd-live-sample {
+    background: var(--screen);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+.bd-stage-empty, .bd-live-sample-empty {
+    color: var(--dimmer);
+    font-size: 22px;
+    display: flex; align-items: center; justify-content: center;
+    min-height: 120px;
+}
+.bd-live-sample-head {
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+    padding: 5px 10px;
+    font-size: 11px;
+    color: var(--dim);
+}
+.bd-live-sample-head b { color: var(--live); font-weight: 600; }
+.bd-live-sample-body { display: flex; align-items: center; justify-content: center; }
+.bd-live-sample-body img { max-height: 460px; object-fit: contain; }
+.bd-stage-badge, .bd-live-sample-badge {
+    background: rgba(10, 12, 18, .75);
+    color: var(--live);
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 11px;
+}
+
+/* ============ 输出条 ============ */
+.bd-output { border-top: 1px solid var(--line); gap: 6px; }
+.bd-output label, .bd-output .bd-meta { color: var(--dim); }
+.bd-output .bd-btn-live-preview {
+    background: #232733;
+    border: 1px solid #333a4d;
+    color: var(--dim);
+    border-radius: 4px;
+}
+.bd-output .bd-btn-live-preview.active {
+    background: var(--ok-bg);
+    border-color: var(--ok);
+    color: var(--ok);
+}
+
+/* ============ 面板与卡片（我们旧卡片的样子） ============ */
+.bd-panel, .mmx-batch-panel, .mmx-fl2v-panel, .bd-run-status,
+.minimax-pe-host, [class*="minimax-pe"] > div:first-child {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+}
+.bd-panel { padding: 6px; }
+.bd-r2v-common-head b, .bd-seg-head b,
+.bd-r2v-section-title, .bd-label {
+    color: #9fb2d8;
+    font-size: 12px;
+    font-weight: 700;
+}
+.bd-seg-head, .bd-r2v-common-head {
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 4px;
+    margin-bottom: 4px;
+}
+.bd-meta { color: var(--dim); }
+
+/* 输入控件 */
+.bd-wrap .bd-prompt, .bd-wrap .bd-select, .bd-wrap .bd-num,
+.bd-wrap input[type="text"], .bd-wrap input[type="number"], .bd-wrap textarea,
+.minimax-pe-input, .minimax-pe-select, .minimax-pe-url {
+    background: var(--panel2) !important;
+    color: var(--text) !important;
+    border: 1px solid var(--line) !important;
+    border-radius: 4px;
+    font-size: 12px;
+}
+.bd-wrap .bd-prompt:focus, .bd-wrap textarea:focus,
+.bd-wrap input:focus, .bd-wrap select:focus {
+    border-color: var(--accent) !important;
+    outline: none;
+}
+
+/* 上传占位块 */
+.bd-gen-src {
+    border: 1px dashed var(--line2) !important;
+    border-radius: var(--radius) !important;
+    background: var(--screen) !important;
+    color: var(--dimmer) !important;
+}
+.bd-gen-src:hover { border-color: var(--accent) !important; color: var(--dim) !important; }
+.bd-gen-src.has-img { border-style: solid !important; border-color: var(--line2) !important; }
+
+/* 参考图格子 */
+.bd-refs .bd-ref, .bd-refs [class*="ref-item"], .bd-refs > div {
+    border-radius: var(--radius);
+    background: var(--screen);
+    border: 1px solid var(--line);
+}
+
+/* 批量卡/片段卡 */
+.mmx-batch-card, .bd-shot-card, .mmx-fl2v-shot,
+.mmx-batch-group, [class*="batch-card"] {
+    background: var(--panel) !important;
+    border: 1px solid var(--line) !important;
+    border-radius: var(--radius) !important;
+}
+.mmx-batch-card.sel, .bd-shot-card.sel,
+.mmx-batch-card:hover, .bd-shot-card:hover {
+    border-color: var(--accent) !important;
+}
+/* 卡片里的视频/预览框：我们的 16:9 暗屏 + 可播放描边 */
+.mmx-batch-card video, .mmx-batch-card img,
+.bd-shot-card video, .bd-shot-card img {
+    background: var(--screen);
+    border-radius: 4px;
+    object-fit: contain;
+}
+
+/* 时间轴画布区 */
+.bd-viewport {
+    background: var(--screen);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+}
+
+/* 徽标（我们旧的三种状态色） */
+.bd-badge, [class*="badge"] {
+    border-radius: 3px;
+    font-size: 10px;
+    padding: 1px 6px;
+}
+.bd-badge.ok, [class*="badge"].ok { background: var(--ok-bg); color: var(--ok); }
+.bd-badge.warn, [class*="badge"].warn { background: var(--warn-bg); color: var(--warn); }
+.bd-badge.bad, [class*="badge"].bad { background: var(--bad-bg); color: var(--bad); }
+
+/* 运行状态/进度：我们的渐变条 */
+.bd-run-status { padding: 6px 10px; }
+.bd-run-status .bd-bar, .bd-run-status [class*="bar"] {
+    background: var(--panel2) !important;
+    border-radius: 7px;
+    overflow: hidden;
+}
+.bd-run-status .bd-bar > div, .bd-run-status [class*="fill"] {
+    background: linear-gradient(90deg, var(--accent2), #35b8a3) !important;
+}
+
+/* 增强面板 */
+.minimax-pe-label { color: var(--dim) !important; }
+
+/* 播放控制条 */
+.bd-controls { background: var(--panel); border-radius: var(--radius); }
+.bd-controls .bd-icon-btn {
+    background: #232733; border: 1px solid #333a4d; color: var(--text); border-radius: 4px;
+}
+.bd-controls input[type="range"] { accent-color: var(--accent2); }
+
+/* 增强结果预览块 */
+.h3sd-pe-preview {
+    background: var(--screen, #0c0e13);
+    border: 1px solid #3a4265;
+    border-radius: 6px;
+    margin-bottom: 6px;
+}
+.h3sd-pe-preview.hidden { display: none; }
+.h3sd-pe-preview-head {
+    padding: 5px 10px;
+    font-size: 11px;
+    color: #9fd3ff;
+    border-bottom: 1px solid #262b38;
+}
+.h3sd-pe-preview pre {
+    margin: 0;
+    padding: 8px 10px;
+    max-height: 220px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #cfd3dd;
+}
+.h3sd-pe-preview-btns { display: flex; gap: 6px; padding: 0 10px 8px; }
+.h3sd-pe-preview-btns button {
+    background: #232733; color: #cfd3dd;
+    border: 1px solid #333a4d; border-radius: 4px;
+    padding: 3px 14px; cursor: pointer; font-size: 12px;
+}
+.h3sd-pe-preview-btns button:hover { background: #2b3040; }
+.h3sd-pe-preview-btns .h3sd-btn-primary { background: #2e6fd8; border-color: #2e6fd8; color: #fff; }
+.h3sd-pe-preview-btns .danger { color: #ff9d9d; }
+
+/* 片段胶片带（我们的时间轴） */
+.h3sd-filmstrip {
+    background: var(--screen, #0c0e13);
+    border: 1px solid #262b38;
+    border-radius: 6px;
+    margin-top: 6px;
+    padding: 4px 6px 6px;
+}
+.h3sd-fs-ruler {
+    position: relative;
+    height: 14px;
+    border-bottom: 1px solid #262b38;
+    margin-bottom: 4px;
+}
+.h3sd-fs-tick {
+    position: absolute;
+    top: 0;
+    font-size: 9px;
+    color: #8b91a3;
+    font-variant-numeric: tabular-nums;
+}
+.h3sd-fs-track {
+    display: flex;
+    gap: 3px;
+    height: 64px;
+}
+.h3sd-fs-cell {
+    position: relative;
+    height: 100%;
+    background: #14161c;
+    border: 1px solid #262b38;
+    border-radius: 4px;
+    overflow: hidden;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+}
+.h3sd-fs-cell img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+.h3sd-fs-cell.sel { border-color: #4da3ff; box-shadow: 0 0 0 1px #4da3ff; }
+.h3sd-fs-cell.playable:hover { border-color: #3a4265; }
+.h3sd-fs-empty { color: #4a5164; font-size: 18px; }
+.h3sd-fs-dot {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #4a5164;
+}
+.h3sd-fs-dot.ok { background: #35b8a3; }
+.h3sd-fs-dot.warn { background: #ffd27f; }
+.h3sd-fs-idx {
+    position: absolute;
+    left: 4px;
+    bottom: 2px;
+    font-size: 10px;
+    color: #cfd3dd;
+    text-shadow: 0 1px 2px #000;
+}
+.h3sd-fs-rebuild { color: #9fd3ff !important; }
