@@ -305,10 +305,6 @@ def run_chain(model, vae, audio_vae, segments_raw, story_cond, sampler, sigmas,
     if opts["context_length"] is not None:
         context_length = max(1, min(39, opts["context_length"]))
     run_audio_mode = opts["audio_mode"]
-    if opts["seed"] is not None:
-        seed = opts["seed"]           # 采样设置（载荷）优先于 Chain 的 seed widget
-    if opts["cfg"] is not None:
-        cfg = opts["cfg"]             # 同上：cfg 覆盖（仅接 negative 时生效）
     run, run_nonce, global_prompt, globals_rows, assets, segs = P.parse_payload(segments_raw)
     if not segs:
         raise ValueError("H3SceneDirector: 请至少加一段带提示词的分镜")

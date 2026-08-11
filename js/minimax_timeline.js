@@ -315,7 +315,10 @@ function stripTimelineEphemeralFields(timeline) {
 const HIDDEN_WIDGETS = [
     "timeline_data", "total_frames", "width", "height", "ref_max_size",
     "task_type", "global_prompt", "frame_rate", "cfg",
-    // seed stays visible under 采样设置 (with control_after_generate)
+    // SceneDirector 适配：采样走 Chain 的接线（KSamplerSelect/BasicScheduler）
+    // 和 Chain widget，上帝节点遗产的 采样设置/性能 组在我们的 List 上隐藏
+    "seed", "bd_grp_sample", "bd_grp_perf",
+    "clear_vram_between_segments", "export_source_images",
 ];
 
 const DIRECTOR_WIDGET_LABEL_KEYS = {

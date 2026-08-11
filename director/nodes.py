@@ -87,11 +87,8 @@ class H3SceneDirectorList:
             payload["context_length"] = options["context_length"]
         if options.get("audio_mode") is not None:
             payload["audio_mode"] = options["audio_mode"]
-        # 采样设置（Director UI 的 cfg/seed）：写进载荷，Chain 优先于自身 widget
-        if seed is not None and int(seed) >= 0:
-            payload["seed"] = int(seed)
-        if cfg is not None:
-            payload["cfg"] = float(cfg)
+        # List 上的 cfg/seed 是 Director UI 兼容件（已隐藏）：采样配置以
+        # Chain 的 widget 与接线为准，这里不写进载荷
         return (json.dumps(payload, ensure_ascii=False),)
 
 
