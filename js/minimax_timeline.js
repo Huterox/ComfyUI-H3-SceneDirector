@@ -87,6 +87,8 @@ import {
     updateFl2vToolbarBtns,
 } from "./minimax_fl2v.js";
 import { mountPromptImageMentions, refreshPromptTokenEditors } from "./minimax_prompt_mentions.js";
+// SceneDirector 适配：挂载 LLM 提示词增强面板（上游此版本未挂载）
+import { mountPromptEnhancerPanel, registerDirectorPromptEnhancerEvents } from "./minimax_prompt_enhancer.js";
 import {
     applyI18nDom,
     aspectDisplayLabel,
@@ -1015,6 +1017,14 @@ function initDirectorEditor(node) {
     try {
         hookTaskTypeWidget(node);
         node._minimaxEditor = new MiniMaxH3DirectorEditor(node, container, node._minimaxDomWidget);
+            // SceneDirector 适配：增强面板挂到编辑器主区
+            try {
+                if (!node._minimaxEditor._promptEnhancer && node._minimaxEditor.mainBody) {
+                    mountPromptEnhancerPanel(node._minimaxEditor, node._minimaxEditor.mainBody);
+                }
+            } catch (peErr) {
+                console.error("[SceneDirector] 提示词增强面板挂载失败:", peErr);
+            }
         ensureDirectorDomWidgetWidth(node);
         bindDirectorDomWidgetSizing(node, node._minimaxDomWidget, () => node._minimaxEditor);
         syncDirectorNodeSize(node, node._minimaxEditor);
@@ -9580,6 +9590,7 @@ app.registerExtension({
             app.queuePrompt._minimaxPatched = true;
         }
 
+                registerDirectorPromptEnhancerEvents(findDirectorNode);
         api.addEventListener("minimax_director_progress", ({ detail }) => {
             findDirectorNode(detail?.node_id)?._minimaxEditor?.setRunProgress?.(detail);
         });
