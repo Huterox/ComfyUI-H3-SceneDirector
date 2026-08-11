@@ -458,6 +458,86 @@
       "name": "run_name"
      },
      "link": null
+    },
+    {
+     "name": "llm_api_format",
+     "type": "STRING",
+     "widget": {
+      "name": "llm_api_format"
+     },
+     "link": null
+    },
+    {
+     "name": "llm_openai_compat_mode",
+     "type": "STRING",
+     "widget": {
+      "name": "llm_openai_compat_mode"
+     },
+     "link": null
+    },
+    {
+     "name": "llm_url",
+     "type": "STRING",
+     "widget": {
+      "name": "llm_url"
+     },
+     "link": null
+    },
+    {
+     "name": "llm_api_key",
+     "type": "STRING",
+     "widget": {
+      "name": "llm_api_key"
+     },
+     "link": null
+    },
+    {
+     "name": "llm_model",
+     "type": "STRING",
+     "widget": {
+      "name": "llm_model"
+     },
+     "link": null
+    },
+    {
+     "name": "llm_output_language",
+     "type": "STRING",
+     "widget": {
+      "name": "llm_output_language"
+     },
+     "link": null
+    },
+    {
+     "name": "llm_character_feature_enhance",
+     "type": "BOOLEAN",
+     "widget": {
+      "name": "llm_character_feature_enhance"
+     },
+     "link": null
+    },
+    {
+     "name": "llm_auto_enhance",
+     "type": "BOOLEAN",
+     "widget": {
+      "name": "llm_auto_enhance"
+     },
+     "link": null
+    },
+    {
+     "name": "llm_unload_after",
+     "type": "BOOLEAN",
+     "widget": {
+      "name": "llm_unload_after"
+     },
+     "link": null
+    },
+    {
+     "name": "llm_custom_template",
+     "type": "STRING",
+     "widget": {
+      "name": "llm_custom_template"
+     },
+     "link": null
     }
    ],
    "outputs": [
@@ -483,7 +563,17 @@
     864,
     124,
     "{\"version\": 4, \"editMode\": \"global\", \"timelineMode\": \"gen_blank\", \"totalFrames\": 120, \"frameRate\": 24.0, \"width\": 864, \"height\": 480, \"refMaxSize\": 864, \"output\": {\"mode\": \"fixed\", \"longEdge\": 864, \"width\": 864, \"height\": 480, \"maxExportFrames\": 0, \"exportMode\": \"all\", \"continuityEnabled\": true, \"continuityOverlapFrames\": 22}, \"videoClips\": [], \"video\": {\"fileName\": \"\", \"videoFile\": \"\", \"subfolder\": \"\", \"type\": \"input\", \"frames\": [], \"frameMap\": []}, \"global\": {\"taskType\": \"t2v — 文生视频(Text to Video)\", \"prompt\": \"Realistic live-action cinematic look: a post-rain dusk metropolis, anamorphic lens, shallow depth of field, film grain, city volumetric fog, flying-car traffic between towers.\\n\\nStoryboard:\\n[0s-2s] High side angle: protagonist sprinting at a roof edge, wind catching their coat.\\n[2s-3.5s] Leap across the gap between buildings, body stretching mid-air.\\n[3.5s-5s] Landing and roll, low-angle shot, keep running into fog.\\n\\nAudio: wind, rapid footsteps, city ambience, low score with accent hits on each leap.\\nNo text, logos or watermarks.\", \"refs\": [], \"referenceVideo\": {}, \"continuousReference\": false, \"genImage\": {\"imageFile\": \"\"}}, \"segments\": [{\"id\": \"s0\", \"start\": 0, \"length\": 120, \"frameCount\": 120, \"durationSec\": 5.0, \"prompt\": \"\", \"taskType\": \"\", \"refs\": [], \"referenceVideo\": {}, \"genImage\": {\"imageFile\": \"\"}, \"negativePrompt\": \"\"}], \"gen\": {\"defaultFrameCount\": 120}, \"runSelectEnabled\": false, \"runSelection\": []}",
-    "demo"
+    "demo",
+    "OpenAI Compatible",
+    "标准",
+    "http://127.0.0.1:11434/v1",
+    "",
+    "qwen3",
+    "中文",
+    false,
+    false,
+    false,
+    ""
    ]
   },
   {

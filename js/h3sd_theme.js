@@ -12,6 +12,28 @@ function polish(node) {
     if (!ed || node._h3sdThemed) return;
     node._h3sdThemed = true;
     try {
+        // 增强结果应用修复：先把文本写进批量卡的 DOM 文本框，
+        // 再走原 apply——否则 commit 的 flushBatchPromptInputs 会
+        // 用卡里的旧草稿把刚应用的增强结果覆盖回去
+        const pe = ed._promptEnhancer;
+        if (pe && !pe._h3sdApplyFixed) {
+            pe._h3sdApplyFixed = true;
+            const origApply = pe.setActivePromptText?.bind(pe);
+            if (origApply) {
+                pe.setActivePromptText = (text) => {
+                    try {
+                        const idx = ed.selectedIndex ?? 0;
+                        const ta = ed.batchList?.querySelector(
+                            `textarea[data-batch-prompt-index="${idx}"]`);
+                        if (ta) {
+                            ta.value = text;
+                            ta.dispatchEvent(new Event("input"));
+                        }
+                    } catch (e) { /* 忽略，走原路径 */ }
+                    return origApply(text);
+                };
+            }
+        }
         // 实时预览大屏提到主区最上方（我们旧工作台的位置）
         const live = ed.liveSampleEl;
         if (live && ed.mainBody && live.parentElement === ed.mainBody) {

@@ -240,7 +240,10 @@ async def get_template(request):
         body = {}
     task = P._task_key_from_label(body.get("task_type") or body.get("task") or "t2v")
     return web.json_response({
-        "template": prompt_enhance._template(task, float(body.get("duration", 5) or 5))})
+        "template": prompt_enhance._template(
+            task, float(body.get("duration", 5) or 5),
+            output_language=str(body.get("output_language", "") or "")),
+        "task_type": task})
 
 
 @PromptServer.instance.routes.post("/minimax/director/enhance")
@@ -248,20 +251,55 @@ async def enhance(request):
     try:
         body = await request.json()
     except Exception as exc:
-        return web.Response(status=400, text="Invalid JSON: %s" % exc)
+        return web.json_response({"error": "Invalid JSON: %s" % exc}, status=400)
+    model = str(body.get("model") or body.get("llm_model") or "").strip()
+    if not model:
+        return web.json_response({"error": "No model selected"}, status=400)
+    prompt = str(body.get("prompt", "") or "").strip()
+    if not prompt:
+        return web.json_response({"error": "Empty prompt"}, status=400)
+    task = P._task_key_from_label(body.get("task_type") or body.get("task") or "t2v")
+    detail = bool(body.get("character_feature_enhance")
+                  if body.get("character_feature_enhance") is not None
+                  else body.get("llm_character_feature_enhance"))
     try:
         text = prompt_enhance.enhance(
-            str(body.get("prompt", "") or ""),
-            task=P._task_key_from_label(body.get("task_type") or body.get("task") or "t2v"),
+            prompt,
+            task=task,
             duration=float(body.get("duration", 5.0) or 5.0),
             api_url=str(body.get("llm_url", "") or body.get("api_url", "")
                         or prompt_enhance.DEFAULT_OLLAMA_URL),
-            model=str(body.get("model", "") or prompt_enhance.DEFAULT_MODEL),
-            api_key=str(body.get("api_key", "") or ""),
-            api_format=str(body.get("api_format", "") or ""))
+            model=model,
+            api_key=str(body.get("api_key", "") or body.get("llm_api_key") or ""),
+            api_format=str(body.get("api_format", "") or body.get("llm_api_format") or ""),
+            images=body.get("images"),
+            output_language=str(body.get("output_language", "")
+                                or body.get("llm_output_language") or ""),
+            character_detail=detail,
+            custom_template=str(body.get("custom_template", "") or ""),
+            unload_after=bool(body.get("unload_ollama") or body.get("llm_unload_after")))
     except Exception as exc:
-        return web.json_response({"error": str(exc)}, status=400)
-    return web.json_response({"response": text})
+        _LOG.exception("enhance 调用失败")
+        return web.json_response({"error": "%s: %s" % (type(exc).__name__, exc)},
+                                 status=502)
+    han_count = sum(1 for ch in text if "\u4e00" <= ch <= "\u9fff")
+    # 上游同名字段：前端的状态条要读 han_count / detailed_mode / detail_target_han
+    node_id = body.get("node") or body.get("node_id")
+    if node_id:
+        try:
+            PromptServer.instance.send_sync("minimax_director_enhanced", {
+                "node": node_id, "text": text,
+                "segment_index": body.get("segment_index"),
+                "field": str(body.get("field", "global") or "global")})
+        except Exception:
+            pass
+    return web.json_response({
+        "response": text,
+        "han_count": han_count,
+        "detailed_mode": bool(detail),
+        "character_feature_enhance": bool(detail),
+        "detail_target_han": 300 if detail else None,
+    })
 
 
 @PromptServer.instance.routes.post("/minimax/director/unload_model")
