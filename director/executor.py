@@ -1,9 +1,16 @@
-"""SceneDirector 窗口衔接引擎：增量重渲 + 运动上下文链接。
+"""SceneDirector 执行器：编码路径 + 窗口衔接链条主循环。
 
-这里只做一件事——逐段衔接。每段的文本条件由上游节点在编码头备好，
+只做一件事——逐段衔接。每段的文本条件由上游节点在编码头备好，
 采样配置（sampler/sigmas/model 补丁/negative）全部来自接线；
 静态图表达不了的部分才留在这里：每段的运动上下文来自上一段的
 采样器输出这一顺序依赖，以及磁盘增量缓存。
+
+特性（Director 1.1 工程化）：
+  * 衔接开关（continuity）：开 = latent 上下文窗口；关 = 官方原生逐段
+  * 选择运行（run mask）：未勾选段缓存填充，无缓存报错引导
+  * 色彩一致性：全片逐帧校色（可选）+ 接缝亮度渐变/回声诊断
+  * 段间 VRAM 清理（可选）
+  * 任务模式：fl2v 段级首尾帧（链条让位）、v2v 源片段与声音模式
 """
 
 import base64
@@ -26,11 +33,16 @@ from server import PromptServer
 from comfy_extras.nodes_minimax_h3 import _empty_av_latent
 
 from ..core.motion_context import (apply_motion_context, trim_av,
-                                   streams_from_av, VIDEO_RUN_GRID)
+                                   VIDEO_RUN_GRID)
+from . import video_io
 from . import payload as P
 from . import cache as C
-from .conditioning import build_cond, load_ref_image, encode_refs, MAX_REFS
-from .colorlock import stats as cl_stats, match_smooth as cl_match
+from .conditioning import (build_cond, load_ref_image, encode_video_ref,
+                           encode_asset_refs, MAX_REFS)
+from .colorlock import (stats as cl_stats, match_smooth as cl_match,
+                        opening_luma_blend, seam_echo_count)
+from . import plan as PL
+from . import vram as VRAM
 
 _LOG = logging.getLogger("h3_scenedirector")
 
@@ -52,6 +64,7 @@ def decode_av(vae, audio_vae, samples):
     普通 [video, audio] 对），保证缓存段和新渲染段解码行为一致。音频分支
     对齐 comfy_extras.nodes_audio.vae_decode_audio（含其归一化）。
     """
+    from ..core.motion_context import streams_from_av
     parts = streams_from_av({"samples": samples})
     video, audio_lat = parts[0], parts[1]
     if video.ndim == 4:  # 无 batch 维的 [C,T,H,W]
@@ -75,57 +88,107 @@ def _concat_audio(a, b):
             "sample_rate": a["sample_rate"]}
 
 
-def encode_story(clip, vae, segments_raw, width, height, first_frame=None):
+# ---------------------------------------------------------------------------
+# 编码路径（编码头节点调用）
+# ---------------------------------------------------------------------------
+
+def encode_story(clip, vae, audio_vae, segments_raw, width, height,
+                 first_frame=None):
     """编码头：把载荷里每一段的完整提示词（场景设定表 + 资产清单 +
-    段提示词 + 段级资产图钉）用接进来的 CLIP 编码，参考图用接进来的
-    视频 VAE 编码，输出逐段 CONDITIONING 列表。链条节点只管消费。"""
+    段提示词 + 段级资产钉）用接进来的 CLIP 编码，参考素材（图/视频/
+    音频）用对应 VAE 编码，输出逐段 CONDITIONING 列表。链条只管消费。
+
+    段级首尾帧（fl2v）经 minimax_keyframes 钉入该段条件；v2v 源片段
+    编码为 <Video K> 参考块。
+    """
     run, run_nonce, global_prompt, globals_rows, assets, segs = P.parse_payload(segments_raw)
     if not segs:
         raise ValueError("H3SceneDirector: 载荷里没有任何段")
     global_block = P.compose_global(global_prompt, globals_rows, assets)
-    n_global_pics = sum(1 for a in assets if a["image"])
 
-    g_images = [load_ref_image(a["image"], a["subfolder"])
-                for a in assets if a["image"]]
-    global_refs = encode_refs(vae, width, height, g_images)
-    seg_img_cache = {}
+    # 全局素材序号（按 kind 分别编号，段级接在后面）
+    n_pic = sum(1 for a in assets if a["image"] and a.get("kind", "image") == "image")
+    n_vid = sum(1 for a in assets if a["image"] and a.get("kind") == "video")
+    n_aud = sum(1 for a in assets if a["image"] and a.get("kind") == "audio")
+
+    global_refs = encode_asset_refs(
+        vae, audio_vae, width, height, assets,
+        video_loader=_video_full, audio_loader=_audio_full)
+    seg_cache = {}
+
+    def _load(kind, a):
+        key = (kind, a["image"], a["subfolder"])
+        if key not in seg_cache:
+            if kind == "video":
+                seg_cache[key] = _video_full(a["image"], a["subfolder"])
+            else:
+                seg_cache[key] = _audio_full(a["image"], a["subfolder"])
+        return seg_cache[key]
 
     conds = []
     for i, seg in enumerate(segs):
         seg_assets = seg.get("assets") or []
-        seg_extra = P.compose_seg_extra(seg_assets, n_global_pics)
+        seg_extra = P.compose_seg_extra(seg_assets, (n_pic, n_vid, n_aud))
         full_prompt = P.compose_prompt(global_block, seg["prompt"], seg_extra)
 
+        ref_items, ref_blocks = list(global_refs[0]), list(global_refs[1])
         if seg_assets:
-            s_images = []
-            for a in seg_assets:
-                if not a["image"]:
-                    continue
-                key = (a["image"], a["subfolder"])
-                if key not in seg_img_cache:
-                    seg_img_cache[key] = load_ref_image(*key)
-                s_images.append(seg_img_cache[key])
-            s_items, s_blocks = encode_refs(vae, width, height, s_images)
-            ref_items = global_refs[0] + s_items
-            ref_blocks = global_refs[1] + s_blocks
-        else:
-            ref_items, ref_blocks = global_refs
+            s_items, s_blocks = encode_asset_refs(
+                vae, audio_vae, width, height, seg_assets,
+                video_loader=lambda f, sf: _load("video", {"image": f, "subfolder": sf}),
+                audio_loader=lambda f, sf: _load("audio", {"image": f, "subfolder": sf}))
+            ref_items += s_items
+            ref_blocks += s_blocks
+
+        # v2v 源片段 -> <Video K> 参考块
+        if seg.get("source"):
+            s = seg["source"]
+            frames = video_io.decode_frames(s["video"], s["subfolder"],
+                                            s["start"], s["end"])
+            v_item, v_block = encode_video_ref(vae, width, height, frames)
+            ref_items.append(v_item)
+            ref_blocks.append(v_block)
+
         if len(ref_blocks) > MAX_REFS:
             _LOG.warning("run %r 段 %d: %d 个参考块（>%d）可能挤占条件行",
                          run, i + 1, len(ref_blocks), MAX_REFS)
-        _LOG.info("run %r 段 %d: %d 个参考块; 提示词: %.100s",
-                  run, i + 1, len(ref_blocks), full_prompt.replace("\n", " "))
+        _LOG.info("run %r 段 %d [%s]: %d 个参考块; 提示词: %.100s",
+                  run, i + 1, seg.get("task", "t2v"),
+                  len(ref_blocks), full_prompt.replace("\n", " "))
 
-        # 段 1 的渲染长度就是 base_length（没有钉帧跨度补偿），它的关键帧
-        # frame_count 与链条建的 latent 一致。后续段不带关键帧，条件与长度
-        # 无关，latent 尺寸由链条在运行时决定（那时才知道真实钉帧跨度）。
+        # 段级首尾帧（fl2v）；节点级 first_frame 只作用于段 1
+        ff = load_ref_image(seg["first_frame"]["image"],
+                            seg["first_frame"]["subfolder"]) \
+            if seg.get("first_frame") else None
+        lf = load_ref_image(seg["last_frame"]["image"],
+                            seg["last_frame"]["subfolder"]) \
+            if seg.get("last_frame") else None
+        if i == 0 and first_frame is not None and ff is None:
+            ff = first_frame
+
         cond, _latent = build_cond(
             clip, vae, full_prompt, width, height, P.base_length(seg["duration"]),
-            first_frame=first_frame if i == 0 else None,
+            first_frame=ff, last_frame=lf,
             ref_items=ref_items, ref_blocks=ref_blocks)
         conds.append(cond)
     return {"width": int(width), "height": int(height), "conds": conds}
 
+
+def _video_full(video, subfolder):
+    """视频资产整段解码。"""
+    dur = video_io.probe_video(video, subfolder)["duration"]
+    return video_io.decode_frames(video, subfolder, 0.0, dur)
+
+
+def _audio_full(video, subfolder):
+    """音频资产整段读取（复用 video_io 的音轨抽取）。"""
+    dur = video_io.probe_video(video, subfolder)["duration"]
+    return video_io.extract_audio(video, subfolder, 0.0, dur)
+
+
+# ---------------------------------------------------------------------------
+# 采样
+# ---------------------------------------------------------------------------
 
 def _sample(model, positive, latent, seed, sampler, sigmas, negative=None, cfg=1.0,
             live=None):
@@ -181,12 +244,17 @@ def _sample(model, positive, latent, seed, sampler, sigmas, negative=None, cfg=1
     return out
 
 
+# ---------------------------------------------------------------------------
+# 链条主循环
+# ---------------------------------------------------------------------------
+
 def run_chain(model, vae, audio_vae, segments_raw, story_cond, sampler, sigmas,
               width, height, seed, context_length, audio_context_length,
               encode_mode, anchor_mode, audio_mode, crop, cfg, cache_tag,
-              uniform_window=False, color_lock=False, negative=None):
-    """链条主循环：缓存命中段直接解码，自第一个变动段起级联重渲。
-    返回 (images, audio, contact_sheet, info)。"""
+              uniform_window=False, color_lock=False, negative=None,
+              continuity=True, seam_blend=True, vram_cleanup=False):
+    """链条主循环：缓存命中段直接解码，自第一个变动段起级联重渲；
+    未勾选段（选择运行关闭）走缓存填充。返回 (images, audio, contact_sheet, info)。"""
     run, run_nonce, global_prompt, globals_rows, assets, segs = P.parse_payload(segments_raw)
     if not segs:
         raise ValueError("H3SceneDirector: 请至少加一段带提示词的分镜")
@@ -210,22 +278,34 @@ def run_chain(model, vae, audio_vae, segments_raw, story_cond, sampler, sigmas,
                            audio_context_length, encode_mode, anchor_mode,
                            audio_mode, crop, global_prompt, globals_rows, assets,
                            P.sampling_fp(sampler, sigmas, negative, cfg),
-                           cache_tag=str(cache_tag or "").strip(), seed=seed)
+                           cache_tag=str(cache_tag or "").strip(), seed=seed,
+                           continuity=continuity, seam_blend=seam_blend)
     hashes = [P.seg_hash(i, s) for i, s in enumerate(segs)]
     global_block = P.compose_global(global_prompt, globals_rows, assets)
+    run_plan = PL.build_plan(run, segs, hashes)
 
-    # 第一个必须重渲的段；它之后的全部级联
+    # 未勾选段必须已有缓存，否则给出引导（选择运行的固有约束）
+    cached_meta0 = meta.get("segments") or [] \
+        if meta.get("global_hash") == g_hash else []
+    for sp in run_plan.segments:
+        if sp.enabled:
+            continue
+        m = cached_meta0[sp.index] if sp.index < len(cached_meta0) else None
+        if (not m or not os.path.isfile(C.latent_path(rd, sp.index))):
+            raise ValueError(
+                "H3SceneDirector: 段 %d 未勾选运行，但缓存里没有它的渲染结果。"
+                "请先勾选它跑过一次，或改为全选运行。" % (sp.index + 1))
+
+    # 第一个必须重渲的启用段；它之后启用的段全部级联
     first_dirty = 0
     cached_meta = []
     if meta.get("global_hash") == g_hash:
-        cached_meta = meta.get("segments") or []
-        first_dirty = len(segs)
-        for i, h in enumerate(hashes):
-            m = cached_meta[i] if i < len(cached_meta) else None
-            if (not m or m.get("hash") != h or m.get("trim") is None
-                    or not os.path.isfile(C.latent_path(rd, i))):
-                first_dirty = i
-                break
+        cached_meta = cached_meta0
+        first_dirty = PL.first_dirty_index(
+            run_plan, cached_meta,
+            lambda idx: os.path.isfile(C.latent_path(rd, idx)))
+    n_render = sum(1 for sp in run_plan.segments if sp.enabled and sp.index >= first_dirty)
+    n_cached = len(segs) - n_render
 
     if seed is not None and seed >= 0:
         base_seed = seed
@@ -234,23 +314,20 @@ def run_chain(model, vae, audio_vae, segments_raw, story_cond, sampler, sigmas,
     else:
         base_seed = random.randrange(0, 0xffffffffffffffff)
 
-    n_render = len(segs) - first_dirty
     _LOG.info("run %r: %d 段, %d 缓存, %d 待渲, base_seed %d, "
-              "%d 行设定, %d 个场景资产, cfg %.2f, %s",
-              run, len(segs), first_dirty, n_render, base_seed,
+              "%d 行设定, %d 个场景资产, cfg %.2f, %s, 衔接 %s",
+              run, len(segs), n_cached, n_render, base_seed,
               len(globals_rows), len(assets), float(cfg),
-              "引导采样" if negative is not None else "仅正条件")
+              "引导采样" if negative is not None else "仅正条件",
+              "开" if continuity else "关")
 
-    # 运动上下文与裁剪都是 core.motion_context 里的函数式接口
     all_images, all_audio = [], None
     seg_meta, info_lines = [], []
     prev_images = prev_aud = None
 
     def delivered_view(imgs, aud, trim, duration):
         """完整渲染 -> 实际交付视图：先去钉帧头（音画同步 trim + 修尾部
-        网格盈余），再裁到精确时长。连续性锚点必须锚在这个视图上：
-        渲染窗口被 VAE 网格向上取整的盈余尾巴（最多 16 帧）若留在连续
-        链里，交付时间线每段就会跳那么长一截。"""
+        网格盈余），再裁到精确时长。连续性锚点必须锚在这个视图上。"""
         if trim:
             out_i, out_a = trim_av(imgs, aud, trim,
                                    fps=float(P.FPS), match_tail=True)
@@ -266,7 +343,7 @@ def run_chain(model, vae, audio_vae, segments_raw, story_cond, sampler, sigmas,
                 out_a = {"waveform": wav[..., :want_samples], "sample_rate": sr}
         return out_i, out_a
 
-    if first_dirty > 0:
+    if first_dirty > 0 and continuity:
         # 级联点之前的最后一段提供运动上下文（用它的交付视图）
         pl = C.load_segment_latent(rd, first_dirty - 1)
         pi, pa = decode_av(vae, audio_vae, pl["samples"])
@@ -275,7 +352,8 @@ def run_chain(model, vae, audio_vae, segments_raw, story_cond, sampler, sigmas,
             segs[first_dirty - 1]["duration"])
 
     for i, seg in enumerate(segs):
-        cached_hit = i < first_dirty
+        sp = run_plan.segments[i]
+        cached_hit = (i < first_dirty) or (not sp.enabled)
         if cached_hit:
             latent = C.load_segment_latent(rd, i)
             imgs, aud = decode_av(vae, audio_vae, latent["samples"])
@@ -285,16 +363,17 @@ def run_chain(model, vae, audio_vae, segments_raw, story_cond, sampler, sigmas,
             if positive is None:
                 raise ValueError(
                     "H3SceneDirector: 段 %d 的条件为空，请重跑编码头。" % (i + 1))
+            use_cont = PL.use_continuity(run_plan, sp, continuity) \
+                and prev_images is not None
             want = max(5, round(seg["duration"] * P.FPS))
-            if i > 0:
+            if use_cont:
                 # head 模式钉帧会把上一段尾部的 span 帧复制进本段输出，
                 # trim 再把它裁掉，所以裸 dur*FPS 的窗口会少交付 span 帧。
-                # 窗口按钉帧跨度加大（与编码器同一个 VIDEO_RUN_GRID 吸附）。
-                avail = int(prev_images.shape[0]) if prev_images is not None else 0
+                avail = int(prev_images.shape[0])
                 n_pin = min(int(context_length), avail)
                 span = next((g for g in VIDEO_RUN_GRID if g <= n_pin), 1)
                 want += span
-            elif uniform_window:
+            elif uniform_window and i == 0 and continuity:
                 # 段 1 也补齐到统一的渲染窗口，保证每次采样的打包 latent
                 # 尺寸一致（MultiRate T8 这类采样器会逐次校验）
                 span = next((g for g in VIDEO_RUN_GRID
@@ -302,10 +381,9 @@ def run_chain(model, vae, audio_vae, segments_raw, story_cond, sampler, sigmas,
                 want += span
             length = P.align_frame_count(want)
             latent_in, _fc = _empty_av_latent(width, height, length)
-            if i > 0:
+            if use_cont:
                 # 钉上一段"实际交付"的尾帧（像素）+ 交付波形（音频 VAE
-                # 路径，落点精确到交付边界），而不是完整渲染的尾巴——
-                # 网格对齐的盈余尾巴不参与连续性
+                # 路径，落点精确到交付边界），而不是完整渲染的尾巴
                 positive, trim = apply_motion_context(
                     positive, vae, latent_in, prev_images,
                     context_length, encode_mode, anchor_mode,
@@ -315,7 +393,7 @@ def run_chain(model, vae, audio_vae, segments_raw, story_cond, sampler, sigmas,
                 trim = 0
             PromptServer.instance.send_sync(PROGRESS_EVENT, {
                 "run": run, "segment": i + 1, "total": len(segs),
-                "cached": first_dirty})
+                "cached": n_cached})
             seg_seed = (base_seed + i) & 0xffffffffffffffff
 
             def _live(step, total_steps, img, _i=i):
@@ -336,18 +414,32 @@ def run_chain(model, vae, audio_vae, segments_raw, story_cond, sampler, sigmas,
             latent = _sample(model, positive, latent_in, seg_seed,
                              sampler, sigmas, negative, cfg, live=_live)
             imgs, aud = decode_av(vae, audio_vae, latent["samples"])
+            VRAM.cleanup_segment_vram(vram_cleanup)
 
         out_imgs, out_aud = delivered_view(imgs, aud, trim, seg["duration"])
+
+        # v2v 声音模式：original = 源片段原声；mute = 静音（采样率对齐生成流，
+        # 否则拼接时音高/时长全错）
+        if seg.get("source") and seg.get("audio_mode", "generate") != "generate":
+            out_aud = _source_audio_view(seg, out_aud, out_imgs)
+
         # 颜色锁定：第 1 段的交付视图自身作为统计参考，后续段在交付前
         # 按通道对齐整段均值/方差，压制逐段独立渲染的白平衡/曝光漂移。
-        # 校正后的交付像素同时充当连续性锚点，下一段的运动上下文也受益
         if color_lock:
             if i == 0:
                 cl_ref = cl_stats(out_imgs)
             else:
                 out_imgs = cl_match(out_imgs, *cl_ref)
-        # 运动上下文锚在"实际交付"的尾部：网格盈余尾巴退出连续链，
-        # 交付时间线的接缝才没有洞
+
+        # 接缝互补（第二层）：开头几帧亮度向上一段尾巴渐变，消除接口跳变；
+        # 回声帧只做诊断日志。仅在本段用了链条衔接时才有意义
+        used_cont = (not cached_hit) and trim > 0
+        if seam_blend and i > 0 and prev_images is not None and used_cont:
+            echo = seam_echo_count(out_imgs[:4], prev_images[-4:])
+            if echo:
+                _LOG.info("run %r 段 %d: 接缝回声 %d 帧", run, i + 1, echo)
+            out_imgs = opening_luma_blend(out_imgs, prev_images[-1:])
+
         prev_images = out_imgs
         prev_aud = out_aud
 
@@ -376,15 +468,18 @@ def run_chain(model, vae, audio_vae, segments_raw, story_cond, sampler, sigmas,
         drift = abs(frames / float(P.FPS) - wav_s / int(out_aud["sample_rate"])) * 1000.0
         seg_meta.append({
             "hash": hashes[i], "frames": frames, "seed": seg_seed, "trim": trim,
+            "task": sp.task, "enabled": sp.enabled,
             "poster_file": base + ".jpg", "mp4_file": base + ".mp4",
         })
         tag = "缓存" if cached_hit else "新渲染"
+        if not sp.enabled:
+            tag = "缓存·未勾选"
         if color_lock and i > 0:
             tag += "·校色"
         info_lines.append(
-            "段 %d: %d 帧 / %.2fs, seed %d, trim %d, 音画漂移 %.1fms [%s]"
-            % (i + 1, frames, frames / float(P.FPS), seg_seed, trim, drift,
-               tag))
+            "段 %d [%s]: %d 帧 / %.2fs, seed %d, trim %d, 音画漂移 %.1fms [%s]"
+            % (i + 1, sp.task, frames, frames / float(P.FPS), seg_seed, trim,
+               drift, tag))
 
     meta_out = C.new_meta(run, g_hash, global_prompt, globals_rows,
                           P.assets_fp(assets), base_seed, seg_meta)
@@ -397,11 +492,11 @@ def run_chain(model, vae, audio_vae, segments_raw, story_cond, sampler, sigmas,
     # 前端定格 100% 不能依赖宿主事件名，由引擎自己发
     PromptServer.instance.send_sync(PROGRESS_EVENT, {
         "run": run, "segment": len(segs), "total": len(segs),
-        "cached": first_dirty, "done": True})
+        "cached": n_cached, "done": True})
 
     total_frames = sum(int(t.shape[0]) for t in all_images)
     header = ("运行 %r: %d 段 (%d 新渲染 / %d 缓存), base_seed %d, 共 %d 帧 / %.2fs"
-              % (run, len(segs), n_render, first_dirty, base_seed,
+              % (run, len(segs), n_render, n_cached, base_seed,
                  total_frames, total_frames / float(P.FPS)))
     if global_block:
         header += "\n全局设定: " + (global_block[:60] + "…" if len(global_block) > 60 else global_block)
@@ -410,3 +505,30 @@ def run_chain(model, vae, audio_vae, segments_raw, story_cond, sampler, sigmas,
 
     return (torch.cat(all_images, dim=0), all_audio,
             C.contact_sheet(all_images), info)
+
+
+def _source_audio_view(seg, out_aud, out_imgs):
+    """v2v 声音模式：把交付音频替换为源片段原声（original）或静音（mute），
+    采样率与时长对齐当前交付视图。"""
+    sr = int(out_aud["sample_rate"])
+    n = int(out_imgs.shape[0])
+    want = int(round(n / float(P.FPS) * sr))
+    if seg.get("audio_mode") == "mute":
+        wav = torch.zeros(1, out_aud["waveform"].shape[1], want)
+        return {"waveform": wav, "sample_rate": sr}
+    s = seg["source"]
+    src = video_io.extract_audio(s["video"], s["subfolder"], s["start"], s["end"],
+                                 sample_rate=sr)
+    if src is None:
+        _LOG.warning("v2v 段原声为空（源视频无音轨），退回静音。")
+        wav = torch.zeros(1, out_aud["waveform"].shape[1], want)
+        return {"waveform": wav, "sample_rate": sr}
+    wav = src["waveform"]
+    ch = out_aud["waveform"].shape[1]
+    if wav.shape[1] != ch:
+        wav = wav[:, :ch] if wav.shape[1] > ch else wav.repeat(1, ch, 1)[:, :ch]
+    if wav.shape[-1] >= want:
+        wav = wav[..., :want]
+    else:
+        wav = torch.nn.functional.pad(wav, (0, want - wav.shape[-1]))
+    return {"waveform": wav, "sample_rate": sr}

@@ -1,7 +1,7 @@
 [project]
 name = "comfyui-h3-scenedirector"
-description = "MiniMax H3 场景导演工作台：分镜时间线 + 特征上下文窗口衔接的增量式长视频生成"
-version = "0.1.0"
+description = "MiniMax H3 场景导演工作台：特征上下文窗口衔接的多段长视频导演台（Director 1.1 工程化）"
+version = "2.0.0"
 license = {text = "Apache-2.0"}
 dependencies = []
 
@@ -9,6 +9,6 @@ dependencies = []
 Repository = "https://github.com/Huterox/ComfyUI-H3-SceneDirector"
 
 [tool.comfy]
-PublisherId = ""
+PublisherId = "huterox"
 DisplayName = "ComfyUI-H3-SceneDirector"
 Icon = ""

@@ -1,26 +1,23 @@
-"""SceneDirector 的 ComfyUI 节点类（薄壳）。
+"""SceneDirector 的 ComfyUI 节点类（薄壳，拒绝上帝节点）。
 
-设计原则：不做上帝节点。
   H3SceneDirectorList          工作台数据载体（载荷 -> SEGMENTS）
   H3SceneDirectorConditioning  文本侧：逐段条件编码，发生在明面上
   H3SceneDirectorChain         纯衔接：钉帧 -> 采样 -> 解码 -> 缓存 -> 拼接
   H3SceneDirectorLatentTemplate 统一渲染窗口的空 AV latent（给会校验
                                打包尺寸的采样器，如 MultiRate T8）
 
-采样配置（model 补丁、sampler、sigmas、negative/cfg）全部走接线。
+采样配置（model 补丁、sampler、sigmas、negative/cfg）全部走接线——
+Spectrum 等加速节点即插即用。
 """
 
 import json
 
 from . import payload as P
-from . import engine
+from . import executor
 
 
 def _default_payload():
-    """默认的 3 段"无畏机甲 vs 兽人"场景，按承接句协议书写：
-    场景表里有固定的走位/机位行，每段开头声明继承的状态、结尾交代
-    移交的状态——跨段的运动逻辑活在文本里，因为钉帧只带约 1 秒的
-    运动记忆。"""
+    """默认的 3 段"无畏机甲 vs 兽人"场景，按承接句协议书写。"""
     return {
         "run": "story",
         "run_nonce": 0,
@@ -35,21 +32,21 @@ def _default_payload():
         ],
         "assets": [],
         "segments": [
-            {"duration": 5.0, "nonce": "dread1", "assets": [], "prompt": (
+            {"duration": 5.0, "nonce": "dread1", "assets": [], "enabled": True, "prompt": (
                 "integrated_multimodal_description: [Shot 1] 开场：硝烟弥漫的废墟大道，无畏机甲从画面左方入画，"
                 "沿大道向画面右前方稳步推进，右臂爆弹炮向右前方深处的兽人潮持续点射，炮口火舌喷吐。 "
                 "[Shot 2] At 00:02.500 机甲脚步不停继续向右前方推进，弹壳抛落，"
                 "兽人从瓦砾后嚎叫着涌出迎面扑来。收尾状态：机甲面朝右前方行进中，机位不变。\n"
                 "overall_soundscape: 爆弹轰鸣、兽人嘶吼、沉重脚步声、远处爆炸。\n"
                 "non_diegetic_music: 战鼓渐强，紧张气氛升温。")},
-            {"duration": 5.0, "nonce": "dread2", "assets": [], "prompt": (
+            {"duration": 5.0, "nonce": "dread2", "assets": [], "enabled": True, "prompt": (
                 "integrated_multimodal_description: [Shot 1] 承接上段：机甲面朝右前方推进中，机位不变。"
                 "兽人扑到近前，机甲左臂动力拳横扫将它们砸飞，脚步不停。 [Shot 2] At 00:02.500 "
                 "机甲边行进边挥拳，又一拳击碎一头跃起的兽人，火花与血雾迸溅，继续向右前方推进。"
                 "收尾状态：机甲仍在行进，兽人攻势减弱。\n"
                 "overall_soundscape: 金属撞击、重拳闷响、兽人哀嚎、液压轰鸣。\n"
                 "non_diegetic_music: 凶猛打击乐，持续激战节奏。")},
-            {"duration": 5.0, "nonce": "dread3", "assets": [], "prompt": (
+            {"duration": 5.0, "nonce": "dread3", "assets": [], "enabled": True, "prompt": (
                 "integrated_multimodal_description: [Shot 1] 承接上段：机甲向右前方推进，机位不变。"
                 "兽人潮在重火力与重拳下溃散，转身向画面右方深处奔逃，机甲踏着燃烧的残骸继续前进，"
                 "爆弹炮向逃敌点射。 [Shot 2] At 00:02.500 大道前方渐渐清空，硝烟与火光映红天际，"
@@ -62,7 +59,7 @@ def _default_payload():
 
 class H3SceneDirectorList:
     """导演工作台的数据载体。js/workbench 前端把载荷渲染成分镜时间线
-    （场景设定表、资产卡、逐段缩略图/状态/重摇/资产图钉）；本节点把
+    （场景设定表、资产卡、逐段缩略图/状态/勾选/资产钉）；本节点把
     run 名钉进去，把载荷交给编码头和链条。"""
 
     @classmethod
@@ -102,11 +99,11 @@ class H3SceneDirectorList:
 
 
 class H3SceneDirectorConditioning:
-    """逐段文本/参考图条件，在衔接引擎之外构建，文本编码器侧保持可hack。
+    """逐段文本/参考素材条件，在衔接引擎之外构建，文本编码器侧保持可hack。
 
     每段拼出完整提示词（场景设定表 + 资产清单 + 段提示词 + 段级资产
-    图钉），用接进来的 CLIP 编码——任何 CLIP 补丁或自定义编码都能插在
-    它前面；资产参考图用接进来的视频 VAE 按官方 r2v 配比编码。
+    钉），用接进来的 CLIP 编码；资产参考（图/视频/音频）与 v2v 源片段
+    用接进来的 VAE 按官方 r2v 配比编码；段级首尾帧钉为关键帧（fl2v）。
     """
 
     @classmethod
@@ -122,6 +119,8 @@ class H3SceneDirectorConditioning:
                 "height": ("INT", {"default": 768, "min": 32, "max": 8192, "step": 32}),
             },
             "optional": {
+                # 音频参考块/v2v 原声需要它（图/视频参考不接也能跑）
+                "audio_vae": ("VAE",),
                 # 钉为段 1 的第 0 帧关键帧（i2v 开场）
                 "first_frame": ("IMAGE",),
             },
@@ -132,11 +131,12 @@ class H3SceneDirectorConditioning:
     FUNCTION = "encode"
     CATEGORY = "conditioning/minimax"
     DESCRIPTION = ("在衔接引擎之外，用接进来的 CLIP/VAE 编码每一段的条件"
-                   "（场景表 + 资产参考 + 段提示词）。")
+                   "（场景表 + 资产参考 + 段提示词 + 首尾帧/源片段）。")
 
-    def encode(self, clip, vae, segments, width, height, first_frame=None):
-        return (engine.encode_story(clip, vae, segments, width, height,
-                                    first_frame=first_frame),)
+    def encode(self, clip, vae, segments, width, height,
+               audio_vae=None, first_frame=None):
+        return (executor.encode_story(clip, vae, audio_vae or vae, segments,
+                                      width, height, first_frame=first_frame),)
 
 
 class H3SceneDirectorChain:
@@ -149,7 +149,7 @@ class H3SceneDirectorChain:
         （不接 negative 时保持官方 H3 的仅正条件行为）
 
     缓存：每段落盘 output/h3_scenedirector/<run>/，只从第一个变动段
-    起级联重渲。"""
+    起级联重渲；选择运行关闭的段用缓存填充。"""
 
     @classmethod
     def INPUT_TYPES(s):
@@ -185,6 +185,14 @@ class H3SceneDirectorChain:
                     "tooltip": "手动缓存作废标签。磁盘缓存无法指纹化你接进来的 "
                                "UNET/LoRA，换模型或加速器后改一下这个标签"
                                "（比如 'turbo4'）即可强制全链重渲。"}),
+                "continuity": ("BOOLEAN", {
+                    "default": True,
+                    "tooltip": "段间引导（特征上下文窗口衔接）：开 = 把上一段尾部的 "
+                               "latent 上下文钉入下一段；关 = 官方原生逐段独立渲染。"}),
+                "seam_blend": ("BOOLEAN", {
+                    "default": True,
+                    "tooltip": "接缝互补：本段开头几帧亮度向上一段尾巴渐变，"
+                               "消除接口跳变（仅在衔接开启时生效）。"}),
                 "uniform_window": ("BOOLEAN", {
                     "default": False,
                     "tooltip": "每段（含段 1）都按统一窗口渲染（时长+钉帧跨度）。"
@@ -195,6 +203,10 @@ class H3SceneDirectorChain:
                     "tooltip": "颜色锁定：每段交付前把整段色温/曝光统计对齐到第 1 段，"
                                "压制逐段独立渲染的白平衡/曝光漂移。锁机位、恒定光照的"
                                "片子（口播/装配）建议开启；光照需要渐变的片子请关闭。"}),
+                "vram_cleanup": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": "段间显存清理：每段渲染完卸载模型并清空 CUDA 缓存。"
+                               "显存吃紧时开启，代价是下一段重新装载权重。"}),
             },
             "optional": {
                 "negative": ("CONDITIONING",),
@@ -205,19 +217,22 @@ class H3SceneDirectorChain:
     RETURN_NAMES = ("images", "audio", "contact_sheet", "info")
     FUNCTION = "chain"
     CATEGORY = "conditioning/minimax"
-    DESCRIPTION = ("特征上下文窗口衔接（运动上下文）+ 增量重渲。每段缓存到 "
-                   "output/h3_scenedirector/<run>/，只从第一个变动段起重渲。")
+    DESCRIPTION = ("特征上下文窗口衔接（运动上下文）+ 增量重渲 + 选择运行。"
+                   "每段缓存到 output/h3_scenedirector/<run>/，"
+                   "只从第一个变动段起重渲。")
 
     def chain(self, model, vae, audio_vae, segments, story_cond, sampler, sigmas,
               width, height, seed, context_length, audio_context_length,
               encode_mode, anchor_mode, audio_mode, crop, cfg, cache_tag,
-              uniform_window=False, color_lock=False, negative=None):
-        return engine.run_chain(
+              continuity=True, seam_blend=True, uniform_window=False,
+              color_lock=False, vram_cleanup=False, negative=None):
+        return executor.run_chain(
             model, vae, audio_vae, segments, story_cond, sampler, sigmas,
             width, height, seed, context_length, audio_context_length,
             encode_mode, anchor_mode, audio_mode, crop, cfg, cache_tag,
             uniform_window=uniform_window, color_lock=color_lock,
-            negative=negative)
+            negative=negative, continuity=continuity, seam_blend=seam_blend,
+            vram_cleanup=vram_cleanup)
 
 
 class H3SceneDirectorLatentTemplate:

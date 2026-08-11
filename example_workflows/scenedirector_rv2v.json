@@ -1,0 +1,507 @@
+{
+ "id": "h3sd-rv2v",
+ "revision": 0,
+ "last_node_id": 13,
+ "last_link_id": 20,
+ "nodes": [
+  {
+   "id": 1,
+   "type": "UNETLoader",
+   "pos": [
+    -1400,
+    100
+   ],
+   "size": [
+    300,
+    80
+   ],
+   "flags": {},
+   "order": 0,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [],
+   "properties": {
+    "Node name for S&R": "UNETLoader"
+   },
+   "widgets_values": [
+    "minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+    "default"
+   ]
+  },
+  {
+   "id": 2,
+   "type": "CLIPLoader",
+   "pos": [
+    -1400,
+    300
+   ],
+   "size": [
+    300,
+    80
+   ],
+   "flags": {},
+   "order": 0,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [],
+   "properties": {
+    "Node name for S&R": "CLIPLoader"
+   },
+   "widgets_values": [
+    "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+    "minimax",
+    "default"
+   ]
+  },
+  {
+   "id": 3,
+   "type": "VAELoader",
+   "pos": [
+    -1400,
+    480
+   ],
+   "size": [
+    300,
+    80
+   ],
+   "flags": {},
+   "order": 0,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [],
+   "properties": {
+    "Node name for S&R": "VAELoader"
+   },
+   "widgets_values": [
+    "minimax_h3_video_vae_fp16.safetensors"
+   ]
+  },
+  {
+   "id": 4,
+   "type": "VAELoader",
+   "pos": [
+    -1400,
+    620
+   ],
+   "size": [
+    300,
+    80
+   ],
+   "flags": {},
+   "order": 0,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [],
+   "properties": {
+    "Node name for S&R": "VAELoader"
+   },
+   "widgets_values": [
+    "minimax_h3_audio_vae_fp32.safetensors"
+   ]
+  },
+  {
+   "id": 5,
+   "type": "ResolutionSelector",
+   "pos": [
+    -700,
+    300
+   ],
+   "size": [
+    300,
+    80
+   ],
+   "flags": {},
+   "order": 0,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [],
+   "properties": {
+    "Node name for S&R": "ResolutionSelector"
+   },
+   "widgets_values": [
+    "16:9 (Widescreen)",
+    0.4,
+    32
+   ]
+  },
+  {
+   "id": 6,
+   "type": "KSamplerSelect",
+   "pos": [
+    -700,
+    480
+   ],
+   "size": [
+    300,
+    80
+   ],
+   "flags": {},
+   "order": 0,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [],
+   "properties": {
+    "Node name for S&R": "KSamplerSelect"
+   },
+   "widgets_values": [
+    "res_multistep"
+   ]
+  },
+  {
+   "id": 7,
+   "type": "BasicScheduler",
+   "pos": [
+    -700,
+    620
+   ],
+   "size": [
+    300,
+    80
+   ],
+   "flags": {},
+   "order": 0,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [],
+   "properties": {
+    "Node name for S&R": "BasicScheduler"
+   },
+   "widgets_values": [
+    "simple",
+    20,
+    1
+   ]
+  },
+  {
+   "id": 8,
+   "type": "H3SceneDirectorList",
+   "pos": [
+    -1050,
+    -260
+   ],
+   "size": [
+    300,
+    80
+   ],
+   "flags": {},
+   "order": 0,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [],
+   "properties": {
+    "Node name for S&R": "H3SceneDirectorList"
+   },
+   "widgets_values": [
+    "{\n \"run\": \"demo_rv2v\",\n \"run_nonce\": 0,\n \"global_prompt\": \"\",\n \"globals\": [],\n \"assets\": [\n  {\n   \"category\": \"角色\",\n   \"name\": \"目标主体\",\n   \"image\": \"subject.png\",\n   \"subfolder\": \"\",\n   \"note\": \"替换为你的参考主体\",\n   \"kind\": \"image\"\n  }\n ],\n \"segments\": [\n  {\n   \"duration\": 5.0,\n   \"prompt\": \"Restyle <Video 1> with the subject identity of <Picture 1>: keep the source motion and camera, but the protagonist becomes <Picture 1> with consistent face and outfit. Audio: regenerate a matching ambient soundscape.\",\n   \"nonce\": \"\",\n   \"assets\": [],\n   \"enabled\": true,\n   \"first_frame\": null,\n   \"last_frame\": null,\n   \"source\": {\n    \"video\": \"source.mp4\",\n    \"subfolder\": \"\",\n    \"start\": 0.0,\n    \"end\": 5.0\n   },\n   \"audio_mode\": \"generate\"\n  }\n ]\n}",
+    "demo_rv2v"
+   ]
+  },
+  {
+   "id": 9,
+   "type": "H3SceneDirectorConditioning",
+   "pos": [
+    -350,
+    -200
+   ],
+   "size": [
+    300,
+    80
+   ],
+   "flags": {},
+   "order": 0,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [],
+   "properties": {
+    "Node name for S&R": "H3SceneDirectorConditioning"
+   },
+   "widgets_values": [
+    864,
+    480
+   ]
+  },
+  {
+   "id": 10,
+   "type": "H3SceneDirectorChain",
+   "pos": [
+    80,
+    -100
+   ],
+   "size": [
+    300,
+    80
+   ],
+   "flags": {},
+   "order": 0,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [],
+   "properties": {
+    "Node name for S&R": "H3SceneDirectorChain"
+   },
+   "widgets_values": [
+    864,
+    480,
+    -1,
+    "randomize",
+    22,
+    22,
+    "video",
+    "head",
+    "timeline",
+    "disabled",
+    1.0,
+    "",
+    true,
+    true,
+    false,
+    false,
+    false
+   ]
+  },
+  {
+   "id": 11,
+   "type": "CreateVideo",
+   "pos": [
+    520,
+    -100
+   ],
+   "size": [
+    300,
+    80
+   ],
+   "flags": {},
+   "order": 0,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [],
+   "properties": {
+    "Node name for S&R": "CreateVideo"
+   },
+   "widgets_values": [
+    24,
+    8
+   ]
+  },
+  {
+   "id": 12,
+   "type": "SaveVideo",
+   "pos": [
+    850,
+    -100
+   ],
+   "size": [
+    300,
+    80
+   ],
+   "flags": {},
+   "order": 0,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [],
+   "properties": {
+    "Node name for S&R": "SaveVideo"
+   },
+   "widgets_values": [
+    "video/H3SceneDirector_rv2v",
+    "auto",
+    "auto"
+   ]
+  },
+  {
+   "id": 13,
+   "type": "PreviewAny",
+   "pos": [
+    520,
+    120
+   ],
+   "size": [
+    300,
+    80
+   ],
+   "flags": {},
+   "order": 0,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [],
+   "properties": {
+    "Node name for S&R": "PreviewAny"
+   },
+   "widgets_values": []
+  }
+ ],
+ "links": [
+  [
+   1,
+   8,
+   0,
+   9,
+   2,
+   "SEGMENTS"
+  ],
+  [
+   2,
+   8,
+   0,
+   10,
+   3,
+   "SEGMENTS"
+  ],
+  [
+   3,
+   2,
+   0,
+   9,
+   0,
+   "CLIP"
+  ],
+  [
+   4,
+   3,
+   0,
+   9,
+   1,
+   "VAE"
+  ],
+  [
+   5,
+   4,
+   0,
+   9,
+   5,
+   "VAE"
+  ],
+  [
+   6,
+   1,
+   0,
+   10,
+   0,
+   "MODEL"
+  ],
+  [
+   7,
+   3,
+   0,
+   10,
+   1,
+   "VAE"
+  ],
+  [
+   8,
+   4,
+   0,
+   10,
+   2,
+   "VAE"
+  ],
+  [
+   9,
+   9,
+   0,
+   10,
+   4,
+   "STORY_COND"
+  ],
+  [
+   10,
+   6,
+   0,
+   10,
+   5,
+   "SAMPLER"
+  ],
+  [
+   11,
+   7,
+   0,
+   10,
+   6,
+   "SIGMAS"
+  ],
+  [
+   12,
+   5,
+   0,
+   10,
+   7,
+   "INT"
+  ],
+  [
+   13,
+   5,
+   1,
+   10,
+   8,
+   "INT"
+  ],
+  [
+   14,
+   5,
+   0,
+   9,
+   3,
+   "INT"
+  ],
+  [
+   15,
+   5,
+   1,
+   9,
+   4,
+   "INT"
+  ],
+  [
+   16,
+   1,
+   0,
+   7,
+   0,
+   "MODEL"
+  ],
+  [
+   17,
+   10,
+   0,
+   11,
+   0,
+   "IMAGE"
+  ],
+  [
+   18,
+   10,
+   1,
+   11,
+   1,
+   "AUDIO"
+  ],
+  [
+   19,
+   11,
+   0,
+   12,
+   0,
+   "VIDEO"
+  ],
+  [
+   20,
+   10,
+   3,
+   13,
+   0,
+   "*"
+  ]
+ ],
+ "groups": [],
+ "config": {},
+ "extra": {
+  "ds": {
+   "scale": 1,
+   "offset": [
+    0,
+    0
+   ]
+  }
+ },
+ "version": 0.4
+}

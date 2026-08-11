@@ -1,98 +1,78 @@
-// api.js —— 后端通道封装。
-//
-// 这里不 import ComfyUI 的 app/api（js/workbench/ 下的模块一律由入口
-// scenedirector.js 注入依赖，避免再数一遍到 scripts/ 的相对路径层级）。
-//
-// 封装四件事：
-//   postStatus     POST /h3_scenedirector/status（payload 子集 -> 逐段状态）
-//   uploadImage    POST /upload/image（FormData 字段名必须是 image）
-//   *URL           /view 工件 URL 构造（海报 / mp4 / 输入目录参考图）
-//   onProgress / onExecutionEnd   WS 事件订阅（api.addEventListener），
-//                  返回退订函数，节点 onRemoved 时必须调用，避免泄漏
+// SceneDirector 工作台：后端 API 封装 + 实时事件订阅
+// 路由见 director/routes.py；事件见 director/executor.py 顶部常量。
+import { api } from "../../scripts/api.js";
 
-export function createBackend(api) {
-
-    // 编辑后由 progress.js 防抖 800ms 调用；body 形状见 state.statusBody()
-    async function postStatus(body) {
-        const resp = await api.fetchApi("/h3_scenedirector/status", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body),
-        });
-        if (!resp.ok) throw new Error("status 查询失败: HTTP " + resp.status);
-        return await resp.json();
+async function post(path, body) {
+    const r = await api.fetchApi(path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body || {}),
+    });
+    if (!r.ok) {
+        let msg = "HTTP " + r.status;
+        try { msg = (await r.json()).error || msg; } catch (e) { /* 空 */ }
+        throw new Error(msg);
     }
+    return r.json();
+}
 
-    // 返回 {name, subfolder, type}；调用方把 name/subfolder 存进资产卡
-    async function uploadImage(file) {
+export const backend = {
+    // 逐段缓存状态（哈希匹配 + 工件名）
+    status(payload) { return post("/h3_scenedirector/status", payload); },
+    // 源视频元信息
+    probe(video, subfolder) { return post("/h3_scenedirector/probe", { video, subfolder }); },
+    // 智能分镜切点
+    smartSplit(video, subfolder, sensitivity, min_shot) {
+        return post("/h3_scenedirector/smart_split",
+            { video, subfolder, sensitivity, min_shot });
+    },
+    // LLM 提示词增强
+    enhance(prompt, task, duration, opts) {
+        return post("/h3_scenedirector/enhance",
+            Object.assign({ prompt, task, duration }, opts || {}));
+    },
+    // 源视频分块上传（全部块到齐后 done=true，name 为最终落盘名）
+    async uploadVideo(file, onProgress) {
+        const CHUNK = 4 * 1024 * 1024;
+        let offset = 0, name = file.name;
+        while (offset < file.size) {
+            const buf = await file.slice(offset, offset + CHUNK).arrayBuffer();
+            const res = await post("/h3_scenedirector/upload_video", {
+                name, offset, total: file.size,
+                chunk: btoa(String.fromCharCode(...new Uint8Array(buf))),
+            });
+            offset += buf.byteLength;
+            name = res.name;
+            if (onProgress) onProgress(offset / file.size);
+            if (res.done) return res.name;
+        }
+        return name;
+    },
+    // 图片上传走 ComfyUI 官方端点，返回文件名（资产卡/首尾帧用）
+    async uploadImage(file) {
         const fd = new FormData();
         fd.append("image", file, file.name);
-        fd.append("type", "input");
-        fd.append("overwrite", "false");
-        const resp = await api.fetchApi("/upload/image", { method: "POST", body: fd });
-        if (!resp.ok) throw new Error("图片上传失败: HTTP " + resp.status);
-        return await resp.json();
-    }
+        const r = await api.fetchApi("/upload/image", { method: "POST", body: fd });
+        if (!r.ok) throw new Error("图片上传失败 HTTP " + r.status);
+        const j = await r.json();
+        return j.name;
+    },
+    // 缓存工件（海报/mp4）的 URL
+    artifactUrl(run, kind, file) {
+        return api.apiURL("/view?filename=" + encodeURIComponent(file)
+            + "&type=output&subfolder=" + encodeURIComponent("h3_scenedirector/" + run + (kind === "poster" ? "/posters" : "")));
+    },
+};
 
-    // /view 查询串手工拼（encodeURIComponent 把空格编成 %20；
-    // URLSearchParams 会编成 +，aiohttp 的 query 解析不把 + 当空格）
-    function viewQuery(file, subfolder, type) {
-        return "/view?filename=" + encodeURIComponent(file)
-            + "&subfolder=" + encodeURIComponent(subfolder || "")
-            + "&type=" + type;
-    }
+// 实时事件：进度（含引擎自发 done）与逐步预览
+export function onProgress(handler) {
+    const fn = (e) => handler(e.detail);
+    api.addEventListener("h3_scenedirector_progress", fn);
+    return () => api.removeEventListener("h3_scenedirector_progress", fn);
+}
 
-    // 输出目录工件 URL。cacheTag 防浏览器缓存旧图：
-    // 传后端返回的 updated（秒级时间戳）或 Date.now()
-    function outputURL(file, subfolder, cacheTag) {
-        let q = viewQuery(file, subfolder, "output");
-        if (cacheTag) q += "&t=" + encodeURIComponent(String(cacheTag));
-        return api.apiURL(q);
-    }
-
-    // 输入目录（上传的参考图）URL
-    function inputURL(card) {
-        return api.apiURL(viewQuery(card.image, card.subfolder || "", "input"));
-    }
-
-    // 海报：output/h3_scenedirector/<run>/posters/<poster_file>
-    const posterURL = (run, file, cacheTag) =>
-        outputURL(file, "h3_scenedirector/" + run + "/posters", cacheTag);
-
-    // 段视频：output/h3_scenedirector/<run>/<mp4_file>
-    const mp4URL = (run, file, cacheTag) =>
-        outputURL(file, "h3_scenedirector/" + run, cacheTag);
-
-    // WS：渲染进度 {run, segment, total, cached}
-    function onProgress(fn) {
-        const handler = (ev) => fn(ev.detail || {});
-        api.addEventListener("h3_scenedirector_progress", handler);
-        return () => api.removeEventListener("h3_scenedirector_progress", handler);
-    }
-
-    // WS：逐步实时预览 {run, segment, total, step, steps, image(base64 jpeg)}
-    function onStep(fn) {
-        const handler = (ev) => fn(ev.detail || {});
-        api.addEventListener("h3_scenedirector_step", handler);
-        return () => api.removeEventListener("h3_scenedirector_step", handler);
-    }
-
-    // WS：一次执行结束后刷新全部状态。
-    // 0.31 起宿主事件改名 execution_success（execution_end 不再发送），
-    // 两个都订，哪个版本都能收到
-    function onExecutionEnd(fn) {
-        const handler = (ev) => fn(ev.detail || {});
-        api.addEventListener("execution_end", handler);
-        api.addEventListener("execution_success", handler);
-        return () => {
-            api.removeEventListener("execution_end", handler);
-            api.removeEventListener("execution_success", handler);
-        };
-    }
-
-    return {
-        postStatus, uploadImage,
-        outputURL, inputURL, posterURL, mp4URL,
-        onProgress, onStep, onExecutionEnd,
-    };
+export function onStep(handler) {
+    const fn = (e) => handler(e.detail);
+    api.addEventListener("h3_scenedirector_step", fn);
+    return () => api.removeEventListener("h3_scenedirector_step", fn);
 }

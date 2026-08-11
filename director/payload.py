@@ -3,22 +3,27 @@
 本模块只允许纯函数——不 import ComfyUI 的任何东西——这样
 "什么改动会让缓存段失效"这条规则就可以离线单测。
 
-载荷 schema v3（工作台 JSON）：
+载荷 schema v4（Director 1.1 工作台 JSON）：
 
   run           缓存目录名（一次 run = 一个场景）
   run_nonce     手动全链作废计数器
   global_prompt 设定表里的自由文本"通用"行
   globals       [{category, content}] 带标签的场景设定行
-  assets        [{category, name, image, subfolder, note}] 场景资产卡；
-                带图的卡会成为 H3 参考块注入每一段（身份锚），
-                纯文本卡并入全局文本块
-  segments      [{duration, prompt, nonce, assets}] 逐动作行；
-                段级资产的 <Picture> 序号排在全局图之后
+  assets        [{category, name, image, subfolder, note, kind}] 场景资产卡；
+                kind ∈ image(默认)/video/audio；带文件的卡成为 H3 参考块
+                注入每一段（身份锚），纯文本卡并入全局文本块
+  segments      [{duration, prompt, nonce, assets, enabled, task,
+                  first_frame, last_frame, source, audio_mode}]
+                逐动作行。v4 新增（全部可选）：
+                enabled     选择运行（默认 true；false = 用缓存填充）
+                task        t2v/i2v/fl2v/r2v/v2v/rv2v（缺省按素材推断）
+                first_frame {image, subfolder} 段级首帧（i2v/fl2v）
+                last_frame  {image, subfolder} 段级尾帧（fl2v）
+                source      {video, subfolder, start, end} v2v 源片段（秒）
+                audio_mode  generate(默认)/original/mute（v2v 声音模式）
 
-缓存哈希标签当前为 "sd4"：SceneDirector 的哈希规则与旧包 H3-Motion-Context
-的 story chain（标签 "v2"）一致，但两个包即使缓存根目录被指到同一个
-文件夹也绝不能共享缓存条目，所以标签刻意不同。语义发生变化的引擎
-修正会递进标签（sd3 -> sd4：连续性锚点改到交付尾部），旧缓存自动作废。
+缓存哈希标签为 "sd5"：schema v4 的段字段进入段哈希。语义发生变化的
+引擎修正会递进标签，旧缓存自动作废。
 """
 
 import hashlib
@@ -28,7 +33,11 @@ import os
 import folder_paths
 
 FPS = 24
-SCHEMA = 3
+SCHEMA = 4
+
+TASK_KEYS = ("t2v", "i2v", "fl2v", "r2v", "v2v", "rv2v")
+AUDIO_MODES = ("generate", "original", "mute")
+ASSET_KINDS = ("image", "video", "audio")
 
 
 # ---------------------------------------------------------------------------
@@ -75,29 +84,83 @@ def norm_globals(items):
 
 
 def norm_assets(items, fallback_category="角色"):
-    """规范化资产卡 {category, name, image, subfolder, note}。
-    图、名、备注三者至少占一才算有效卡。"""
+    """规范化资产卡 {category, name, image, subfolder, note, kind}。
+    文件、名、备注三者至少占一才算有效卡。kind: image(默认)/video/audio，
+    image 字段同时充当文件名字段（历史命名，视频/音频卡也用它）。"""
     out = []
     for a in items or []:
         if not isinstance(a, dict):
             continue
+        kind = str(a.get("kind", "") or "").strip().lower()
+        if kind not in ASSET_KINDS:
+            kind = "image"
         card = {
             "category": str(a.get("category", "") or "").strip() or fallback_category,
             "name": str(a.get("name", "") or "").strip(),
             "image": str(a.get("image", "") or "").strip(),
             "subfolder": str(a.get("subfolder", "") or "").strip(),
             "note": str(a.get("note", "") or "").strip(),
+            "kind": kind,
         }
         if card["image"] or card["name"] or card["note"]:
             out.append(card)
     return out
 
 
+def _norm_frame_ref(raw):
+    """段级首/尾帧引用 {image, subfolder}；空值返回 None。"""
+    if not isinstance(raw, dict):
+        return None
+    image = str(raw.get("image", "") or "").strip()
+    if not image:
+        return None
+    return {"image": image,
+            "subfolder": str(raw.get("subfolder", "") or "").strip()}
+
+
+def _norm_source(raw):
+    """v2v 源片段 {video, subfolder, start, end}（秒）；空值返回 None。"""
+    if not isinstance(raw, dict):
+        return None
+    video = str(raw.get("video", "") or "").strip()
+    if not video:
+        return None
+    try:
+        start = max(0.0, float(raw.get("start", 0.0) or 0.0))
+        end = float(raw.get("end", 0.0) or 0.0)
+    except (TypeError, ValueError):
+        return None
+    if end <= start:
+        return None
+    return {"video": video,
+            "subfolder": str(raw.get("subfolder", "") or "").strip(),
+            "start": start, "end": end}
+
+
+def infer_task(seg):
+    """缺省任务推断：源片段→v2v（有参考资产则 rv2v）；首尾帧→fl2v；
+    仅首帧→i2v；有文件资产→r2v；否则 t2v。"""
+    explicit = str(seg.get("task", "") or "").strip().lower()
+    if explicit in TASK_KEYS:
+        return explicit
+    has_refs = any(a.get("image") for a in seg.get("assets") or [])
+    if seg.get("source"):
+        return "rv2v" if has_refs else "v2v"
+    if seg.get("first_frame") and seg.get("last_frame"):
+        return "fl2v"
+    if seg.get("last_frame"):
+        return "fl2v"      # 官方支持只传尾帧
+    if seg.get("first_frame"):
+        return "i2v"
+    return "r2v" if has_refs else "t2v"
+
+
 def parse_payload(raw):
     """接受裸段列表（旧格式）或工作台载荷对象。
 
     返回 (run_name, run_nonce, global_prompt, globals_rows, assets, segments)。
-    prompt 为空的段直接丢弃。
+    prompt 为空的段直接丢弃（v2v 段允许只带源片段）。段的任务模式在
+    规范化时一并推断写入 seg["task"]。
     """
     try:
         data = json.loads(raw or "[]")
@@ -125,10 +188,18 @@ def parse_payload(raw):
             dur = 5.0
         prompt = str(item.get("prompt", "") or "").strip()
         nonce = str(item.get("nonce", "") or "")
-        if prompt:
-            segments.append({"duration": dur, "prompt": prompt, "nonce": nonce,
-                             "assets": norm_assets(item.get("assets"),
-                                                   fallback_category="场景")})
+        seg = {"duration": dur, "prompt": prompt, "nonce": nonce,
+               "assets": norm_assets(item.get("assets"),
+                                     fallback_category="场景"),
+               "enabled": bool(item.get("enabled", True)),
+               "first_frame": _norm_frame_ref(item.get("first_frame")),
+               "last_frame": _norm_frame_ref(item.get("last_frame")),
+               "source": _norm_source(item.get("source"))}
+        am = str(item.get("audio_mode", "") or "").strip().lower()
+        seg["audio_mode"] = am if am in AUDIO_MODES else "generate"
+        seg["task"] = infer_task(seg)
+        if prompt or seg["source"]:
+            segments.append(seg)
     return run, run_nonce, global_prompt, globals_rows, assets, segments
 
 
@@ -138,41 +209,47 @@ def parse_payload(raw):
 
 def compose_global(global_prompt, globals_rows, assets):
     """场景级文本块：先是自由文本"通用"行，再是带标签的设定行，
-    最后是资产清单——让提示词明确说明每张 <Picture> 是什么。"""
+    最后是资产清单——让提示词明确说明每个参考素材是什么。
+    图片编 <Picture N>，视频编 <Video K>，音频编 <Audio J>（官方序号）。"""
     lines = []
     if global_prompt:
         lines.append(global_prompt.strip())
     for g in globals_rows or []:
         lines.append("%s：%s" % (g["category"], g["content"]))
-    roster = []
-    pic = 0
-    for a in assets or []:
-        label = "·".join(x for x in (a["category"], a["name"]) if x)
-        if a["image"]:
-            pic += 1
-            label = "<Picture %d>=%s" % (pic, label)
-        if a["note"]:
-            label += "（%s）" % a["note"]
-        roster.append(label)
     block = "\n".join(lines)
+    roster, _ = _asset_roster(assets or [], (0, 0, 0))
     if roster:
-        block = (block + "\n" if block else "") + "资产清单：" + "；".join(roster)
+        block = (block + "\n" if block else "") + "资产清单：" + roster
     return block
 
 
-def compose_seg_extra(seg_assets, pic_offset):
-    """段级清单行；序号接在全局图之后。"""
-    roster = []
-    pic = pic_offset
-    for a in seg_assets:
+def _asset_roster(assets, offsets):
+    """资产清单文本与下一组序号。labels 按 kind 分别编号。"""
+    pic, vid, aud = offsets
+    labels = []
+    for a in assets:
         label = "·".join(x for x in (a["category"], a["name"]) if x)
         if a["image"]:
-            pic += 1
-            label = "<Picture %d>=%s" % (pic, label)
+            kind = a.get("kind", "image")
+            if kind == "video":
+                vid += 1
+                label = "<Video %d>=%s" % (vid, label)
+            elif kind == "audio":
+                aud += 1
+                label = "<Audio %d>=%s" % (aud, label)
+            else:
+                pic += 1
+                label = "<Picture %d>=%s" % (pic, label)
         if a["note"]:
             label += "（%s）" % a["note"]
-        roster.append(label)
-    return ("本段资产：" + "；".join(roster)) if roster else ""
+        labels.append(label)
+    return "；".join(labels), (pic, vid, aud)
+
+
+def compose_seg_extra(seg_assets, offsets):
+    """段级清单行；序号接在全局素材之后。offsets = (pic, vid, aud)。"""
+    roster, _ = _asset_roster(seg_assets, offsets)
+    return ("本段资产：" + roster) if roster else ""
 
 
 def compose_prompt(*parts):
@@ -198,36 +275,50 @@ def _file_sha1(image, subfolder=""):
 
 
 def assets_fp(assets):
-    """内容指纹：图片文件取 sha1，纯文本卡取文本内容。"""
+    """内容指纹：文件卡取 sha1，纯文本卡取文本内容。"""
     fps = []
     for a in assets or []:
         if a["image"]:
-            fps.append(_file_sha1(a["image"], a["subfolder"]))
+            fps.append(a.get("kind", "image") + ":" +
+                       _file_sha1(a["image"], a["subfolder"]))
         else:
             fps.append("text:" + "|".join((a["category"], a["name"], a["note"])))
     return fps
 
 
 def seg_hash(index, seg):
-    """单段内容的身份标识（含段级资产卡）。"""
-    parts = [index, seg["duration"], seg["prompt"], seg["nonce"]]
+    """单段内容的身份标识（含段级资产与 v4 任务字段）。
+    enabled（选择运行）不入哈希——它决定跑不跑，不改变内容。"""
+    parts = ["sd5", index, seg["duration"], seg["prompt"], seg["nonce"],
+             seg.get("task", "t2v"), seg.get("audio_mode", "generate")]
     if seg.get("assets"):
-        parts.append([[a["category"], a["name"], a["note"]] for a in seg["assets"]])
+        parts.append([[a["category"], a["name"], a["note"], a.get("kind", "image")]
+                      for a in seg["assets"]])
         parts.extend(assets_fp(seg["assets"]))
+    for key in ("first_frame", "last_frame"):
+        ref = seg.get(key)
+        if ref:
+            parts.append([key, _file_sha1(ref["image"], ref["subfolder"])])
+    if seg.get("source"):
+        s = seg["source"]
+        parts.append(["source", _file_sha1(s["video"], s["subfolder"]),
+                      s["start"], s["end"]])
     return hashlib.sha1(json.dumps(parts, ensure_ascii=False).encode("utf-8")).hexdigest()
 
 
 def global_hash(run_nonce, width, height, context_length, audio_context_length,
                 encode_mode, anchor_mode, audio_mode, crop,
                 global_prompt="", globals_rows=None, assets=None, sampling_fp="",
-                cache_tag="", seed=-1):
+                cache_tag="", seed=-1, continuity=True, seam_blend=True):
     """会改变每一段结果的所有因素。cache_tag 是显式的手动逃生门：
     模型/LoRA 的身份无法被指纹化（ModelPatcher 没有稳定的内容标识），
     所以换了 UNET 或 LoRA 之后改一下这个 tag，缓存就不会误发旧条目。
     seed 只在显式指定（>=0）时入指纹；-1（随机/沿用 meta 的 base_seed）
-    不入，否则每次运行都会无谓地全链重渲。"""
-    parts = ["sd4", run_nonce, width, height, context_length, audio_context_length,
-             encode_mode, anchor_mode, audio_mode, crop]
+    不入，否则每次运行都会无谓地全链重渲。
+    continuity/seam_blend 改变交付结果，入指纹；vram 清理不改变内容，不入。"""
+    parts = ["sd5", run_nonce, width, height, context_length, audio_context_length,
+             encode_mode, anchor_mode, audio_mode, crop,
+             bool(continuity), bool(seam_blend)]
     if globals_rows or assets:
         parts.append(compose_global(global_prompt, globals_rows, assets))
         parts.extend(assets_fp(assets))
