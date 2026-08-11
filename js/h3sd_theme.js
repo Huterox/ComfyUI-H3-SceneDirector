@@ -12,6 +12,26 @@ function polish(node) {
     if (!ed || node._h3sdThemed) return;
     node._h3sdThemed = true;
     try {
+        // 全局提示词可见性修复：Director 在批量/fl2v 模式把底部全局面板
+        // （全局提示词 + 全局参考）整个 hidden 掉，用户看不到全局提示词。
+        // 包一层 applyTaskLayout：布局算完再强制放出全局面板。
+        if (!ed._h3sdGpFixed) {
+            ed._h3sdGpFixed = true;
+            const origLayout = ed.applyTaskLayout?.bind(ed);
+            if (origLayout) {
+                ed.applyTaskLayout = (...args) => {
+                    const out = origLayout(...args);
+                    try {
+                        const split = ed.root?.querySelector(".bd-split");
+                        split?.classList.remove("hidden");
+                        const gp = ed.root?.querySelector('[data-r="global-panel"]');
+                        if (gp) gp.style.display = "";
+                    } catch (e) { /* 忽略 */ }
+                    return out;
+                };
+                ed.applyTaskLayout(ed._directorMode);
+            }
+        }
         // 增强结果：预览 -> 确认才应用（扩写当前）。
         // apply 前先把文本写进批量卡 DOM——否则 commit 的
         // flushBatchPromptInputs 会用卡里的旧草稿把结果覆盖回去
