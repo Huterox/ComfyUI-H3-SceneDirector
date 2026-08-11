@@ -66,9 +66,9 @@ function inferApiFormat(url, explicit) {
 
 function defaultsForApiFormat(fmt) {
     if (fmt === API_ZHIPU) return { url: DEFAULT_ZHIPU_URL, model: DEFAULT_ZHIPU_MODEL };
-    if (fmt === API_OPENAI_COMPAT) return { url: DEFAULT_OPENAI_COMPAT_URL, model: DEFAULT_LLM_MODEL };
+    if (fmt === API_OPENAI_COMPAT) return { url: "http://127.0.0.1:11434/v1", model: DEFAULT_LLM_MODEL };
     if (fmt === API_ANTHROPIC) return { url: DEFAULT_ANTHROPIC_URL, model: DEFAULT_ANTHROPIC_MODEL };
-    return { url: "http://127.0.0.1:11434", model: DEFAULT_LLM_MODEL };
+    return { url: "http://127.0.0.1:11434/v1", model: DEFAULT_LLM_MODEL };
 }
 
 function normalizeOpenAiCompatMode(mode) {
@@ -235,8 +235,6 @@ export function mountPromptEnhancerPanel(editor, parentEl) {
     pe.apiSelect = document.createElement("select");
     pe.apiSelect.className = "minimax-pe-select";
     for (const [val, label] of [
-        [API_OLLAMA, "Ollama (/api/chat)"],
-        [API_ZHIPU, "智谱 GLM (/paas/v4/chat)"],
         [API_OPENAI_COMPAT, "OpenAI Compatible (/v1/chat/completions)"],
         [API_ANTHROPIC, "Anthropic (/v1/messages)"],
     ]) {
