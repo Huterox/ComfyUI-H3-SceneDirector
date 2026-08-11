@@ -436,10 +436,22 @@ def parse_run_options(raw):
     except (TypeError, ValueError):
         ctx = None
     am = str(data.get("audio_mode", "") or "").strip().lower()
+    try:
+        sd = int(data.get("seed")) if data.get("seed") is not None else None
+        if sd is not None and sd < 0:
+            sd = None
+    except (TypeError, ValueError):
+        sd = None
+    try:
+        cf = float(data.get("cfg")) if data.get("cfg") is not None else None
+    except (TypeError, ValueError):
+        cf = None
     return {
         "continuity": None if cont is None else bool(cont),
         "context_length": ctx,
         "audio_mode": am if am in AUDIO_MODES else None,
+        "seed": sd,
+        "cfg": cf,
     }
 
 
