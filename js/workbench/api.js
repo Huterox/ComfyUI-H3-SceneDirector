@@ -70,6 +70,13 @@ export function createBackend(api) {
         return () => api.removeEventListener("h3_storydirector_progress", handler);
     }
 
+    // WS：逐步实时预览 {run, segment, total, step, steps, image(base64 jpeg)}
+    function onStep(fn) {
+        const handler = (ev) => fn(ev.detail || {});
+        api.addEventListener("h3_storydirector_step", handler);
+        return () => api.removeEventListener("h3_storydirector_step", handler);
+    }
+
     // WS：一次执行结束后刷新全部状态
     function onExecutionEnd(fn) {
         const handler = (ev) => fn(ev.detail || {});
@@ -80,6 +87,6 @@ export function createBackend(api) {
     return {
         postStatus, uploadImage,
         outputURL, inputURL, posterURL, mp4URL,
-        onProgress, onExecutionEnd,
+        onProgress, onStep, onExecutionEnd,
     };
 }

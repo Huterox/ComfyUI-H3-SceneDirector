@@ -21,12 +21,72 @@ function fmtTime(sec) {
 export function createStage({ store, backend, getRun, getSelected, onAction }) {
     const root = el("div", "h3wb-stage");
     const screen = el("div", "h3wb-screen");
+    const split = el("div", "h3wb-vsplit");
     const side = el("div", "h3wb-side");
     root.appendChild(screen);
+    root.appendChild(split);
     root.appendChild(side);
+
+    // 预览窗 | 信息侧栏 之间的竖向分隔条：拖拽分配宽度
+    split.title = "拖拽调整预览窗宽度";
+    split.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+        split.setPointerCapture(e.pointerId);
+        split.classList.add("on");
+        const move = (ev) => {
+            const r = root.getBoundingClientRect();
+            const pct = Math.min(72, Math.max(24,
+                (ev.clientX - r.left) / Math.max(1, r.width) * 100));
+            screen.style.width = pct + "%";
+        };
+        const up = () => {
+            split.classList.remove("on");
+            split.removeEventListener("pointermove", move);
+            split.removeEventListener("pointerup", up);
+        };
+        split.addEventListener("pointermove", move);
+        split.addEventListener("pointerup", up);
+    });
 
     let lastStatus = null;
     let cur = -1;   // 当前展示的段索引（切段时停掉播放）
+    let liveSeg = -1;   // 正在实时预览的段（-1 = 无）
+
+    // 逐步实时预览：渲染中的段把投影帧投进点播窗（别被状态刷新盖掉）
+    function showLive(d) {
+        const i = (d.segment || 0) - 1;
+        if (i !== getSelected()) return;
+        liveSeg = i;
+        let img = screen.querySelector("img.h3wb-live");
+        let tag = screen.querySelector(".h3wb-livetag");
+        if (!img) {
+            screen.innerHTML = "";
+            img = document.createElement("img");
+            img.className = "h3wb-live";
+            tag = el("div", "h3wb-livetag");
+            screen.appendChild(img);
+            screen.appendChild(tag);
+        }
+        img.src = "data:image/jpeg;base64," + d.image;
+        tag.textContent = "实时预览 · 段 " + d.segment + "/" + d.total
+            + " · step " + d.step + "/" + d.steps;
+    }
+
+    // 执行结束/手动点播时清掉实时态，恢复海报
+    function clearLive() { liveSeg = -1; }
+
+    // 放大播放：全屏灯箱内嵌 video，点视频外任意处关闭
+    function showVideoLightbox(url) {
+        const box = el("div", "h3wb-lightbox");
+        const v = document.createElement("video");
+        v.src = url;
+        v.controls = true; v.autoplay = true; v.loop = true;
+        v.addEventListener("click", (e) => e.stopPropagation());  // 点视频不关灯箱
+        box.appendChild(v);
+        box.appendChild(el("span", null, "×"));
+        box.addEventListener("click", () => { v.pause(); box.remove(); });
+        document.body.appendChild(box);
+    }
 
     function segRange(i) {
         let acc = 0;
@@ -48,6 +108,7 @@ export function createStage({ store, backend, getRun, getSelected, onAction }) {
     }
 
     function renderScreen(i) {
+        if (i === liveSeg) return;   // 实时预览中：状态刷新别把投影帧盖掉
         screen.innerHTML = "";
         const st = statusOf(i);
         if (st?.poster_file) {
@@ -66,6 +127,14 @@ export function createStage({ store, backend, getRun, getSelected, onAction }) {
                     screen.appendChild(v);
                 });
                 screen.appendChild(play);
+                // 放大播放（灯箱）：竖版片在 16:9 预览窗里太小，给个大屏出口
+                const zoom = el("button", "h3wb-zoom", "⤢");
+                zoom.title = "放大播放本段";
+                zoom.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    showVideoLightbox(backend.mp4URL(getRun(), st.mp4_file, lastStatus?.updated));
+                });
+                screen.appendChild(zoom);
             }
         } else {
             screen.appendChild(el("div", "h3wb-empty", "未渲染"));
@@ -130,5 +199,5 @@ export function createStage({ store, backend, getRun, getSelected, onAction }) {
         if (cur >= 0) setSegment(cur, true);
     }
 
-    return { element: root, setSegment, applyStatus };
+    return { element: root, setSegment, applyStatus, showLive, clearLive };
 }

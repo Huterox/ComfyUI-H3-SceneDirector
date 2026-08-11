@@ -1,4 +1,4 @@
-"""ComfyUI-H3-StoryDirector：MiniMax H3 的导演工作台（长视频分镜链）。
+"""ComfyUI-H3-SceneDirector：MiniMax H3 的场景导演工作台（长视频分镜链）。
 
 导入时应用两个自研补丁（带共存守卫：同生态补丁已在位则认领养，绝不叠加）：
 

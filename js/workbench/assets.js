@@ -62,6 +62,46 @@ export function createAssets({ store, backend }) {
 
     const pickImage = (card) => { uploadCard = card || null; fileInput.click(); };
 
+    // 放大显示：全屏灯箱，点任意处关闭
+    function showLightbox(url) {
+        const box = el("div", "h3wb-lightbox");
+        const img = document.createElement("img");
+        img.src = url;
+        box.appendChild(img);
+        box.appendChild(el("span", "", "×"));
+        box.addEventListener("click", () => box.remove());
+        document.body.appendChild(box);
+    }
+
+    // 缩略图操作菜单：替换图片 / 放大显示（点菜单外任意处关闭）
+    function showThumbMenu(thumb, card) {
+        if (thumb.querySelector(".h3wb-thumbmenu")) return;   // 已开着就别重复建
+        const menu = el("div", "h3wb-thumbmenu");
+        const bReplace = el("button", "", "替换图片");
+        bReplace.title = "从本机选一张新图（改动会整条重渲）";
+        bReplace.addEventListener("click", (e) => {
+            e.stopPropagation();
+            close();
+            pickImage(card);
+        });
+        const bZoom = el("button", "", "放大显示");
+        bZoom.addEventListener("click", (e) => {
+            e.stopPropagation();
+            close();
+            showLightbox(backend.inputURL(card));
+        });
+        menu.appendChild(bReplace);
+        menu.appendChild(bZoom);
+        const onDoc = (e) => { if (!menu.contains(e.target)) close(); };
+        function close() {
+            menu.remove();
+            document.removeEventListener("pointerdown", onDoc, true);
+        }
+        menu.addEventListener("click", (e) => e.stopPropagation());
+        document.addEventListener("pointerdown", onDoc, true);
+        thumb.appendChild(menu);
+    }
+
     // 拖拽上传：dragover 必须 preventDefault 才会触发 drop
     function bindDrop(zone, card) {
         zone.addEventListener("dragover", (e) => {
@@ -80,14 +120,14 @@ export function createAssets({ store, backend }) {
     function cardEl(card, ord) {
         const elCard = el("div", "h3wb-card");
 
-        // 缩略图 / 上传区（点击上传或换图，可拖拽）
+        // 缩略图 / 上传区（有图点击弹操作菜单：替换图片/放大显示；无图点击直传，可拖拽）
         const thumb = el("div", "h3wb-card-thumb");
         if (card.image) {
             const img = document.createElement("img");
             img.src = backend.inputURL(card);
             img.alt = card.name || card.image;
             thumb.appendChild(img);
-            thumb.title = "点击更换图片（改动会整条重渲）";
+            thumb.title = "点击：替换图片 / 放大显示（换图会整条重渲）";
             if (ord > 0) {
                 const badge = el("span", "h3wb-pord", "P" + ord);
                 badge.title = "<Picture " + ord + ">";
@@ -98,7 +138,10 @@ export function createAssets({ store, backend }) {
             thumb.textContent = "点击上传\n或拖拽图片到此";
             thumb.title = "上传参考图（角色定妆照 / 场景 / 道具）";
         }
-        thumb.addEventListener("click", () => pickImage(card));
+        thumb.addEventListener("click", () => {
+            if (card.image) showThumbMenu(thumb, card);
+            else pickImage(card);
+        });
         bindDrop(thumb, card);
         elCard.appendChild(thumb);
 

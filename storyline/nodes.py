@@ -3,7 +3,7 @@
 设计原则：不做上帝节点。
   H3StoryDirectorList          工作台数据载体（载荷 -> SEGMENTS）
   H3StoryDirectorConditioning  文本侧：逐段条件编码，发生在明面上
-  H3StoryDirectorChain         纯循环：钉帧 -> 采样 -> 解码 -> 缓存 -> 拼接
+  H3StoryDirectorChain         纯衔接：钉帧 -> 采样 -> 解码 -> 缓存 -> 拼接
   H3StoryDirectorLatentTemplate 统一渲染窗口的空 AV latent（给会校验
                                打包尺寸的采样器，如 MultiRate T8）
 
@@ -102,7 +102,7 @@ class H3StoryDirectorList:
 
 
 class H3StoryDirectorConditioning:
-    """逐段文本/参考图条件，在循环之外构建，文本编码器侧保持可hack。
+    """逐段文本/参考图条件，在衔接引擎之外构建，文本编码器侧保持可hack。
 
     每段拼出完整提示词（场景设定表 + 资产清单 + 段提示词 + 段级资产
     图钉），用接进来的 CLIP 编码——任何 CLIP 补丁或自定义编码都能插在
@@ -131,7 +131,7 @@ class H3StoryDirectorConditioning:
     RETURN_NAMES = ("story_cond",)
     FUNCTION = "encode"
     CATEGORY = "conditioning/minimax"
-    DESCRIPTION = ("在链条循环之外，用接进来的 CLIP/VAE 编码每一段的条件"
+    DESCRIPTION = ("在衔接引擎之外，用接进来的 CLIP/VAE 编码每一段的条件"
                    "（场景表 + 资产参考 + 段提示词）。")
 
     def encode(self, clip, vae, segments, width, height, first_frame=None):
@@ -140,7 +140,7 @@ class H3StoryDirectorConditioning:
 
 
 class H3StoryDirectorChain:
-    """增量循环 + 运动上下文链接驱动。刻意只是循环：
+    """特征上下文窗口衔接 + 增量重渲驱动。刻意只是衔接：
 
       * KSamplerSelect  -> sampler  (SAMPLER)
       * BasicScheduler  -> sigmas   (SIGMAS)
@@ -190,6 +190,11 @@ class H3StoryDirectorChain:
                     "tooltip": "每段（含段 1）都按统一窗口渲染（时长+钉帧跨度）。"
                                "校验打包 latent 尺寸的采样器（MultiRate T8）需要它；"
                                "开启后所有段时长必须相等。"}),
+                "color_lock": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": "颜色锁定：每段交付前把整段色温/曝光统计对齐到第 1 段，"
+                               "压制逐段独立渲染的白平衡/曝光漂移。锁机位、恒定光照的"
+                               "片子（口播/装配）建议开启；光照需要渐变的片子请关闭。"}),
             },
             "optional": {
                 "negative": ("CONDITIONING",),
@@ -200,18 +205,19 @@ class H3StoryDirectorChain:
     RETURN_NAMES = ("images", "audio", "contact_sheet", "info")
     FUNCTION = "chain"
     CATEGORY = "conditioning/minimax"
-    DESCRIPTION = ("增量逐段循环 + H3 运动上下文链接。每段缓存到 "
+    DESCRIPTION = ("特征上下文窗口衔接（运动上下文）+ 增量重渲。每段缓存到 "
                    "output/h3_storydirector/<run>/，只从第一个变动段起重渲。")
 
     def chain(self, model, vae, audio_vae, segments, story_cond, sampler, sigmas,
               width, height, seed, context_length, audio_context_length,
               encode_mode, anchor_mode, audio_mode, crop, cfg, cache_tag,
-              uniform_window=False, negative=None):
+              uniform_window=False, color_lock=False, negative=None):
         return engine.run_chain(
             model, vae, audio_vae, segments, story_cond, sampler, sigmas,
             width, height, seed, context_length, audio_context_length,
             encode_mode, anchor_mode, audio_mode, crop, cfg, cache_tag,
-            uniform_window=uniform_window, negative=negative)
+            uniform_window=uniform_window, color_lock=color_lock,
+            negative=negative)
 
 
 class H3StoryDirectorLatentTemplate:
@@ -261,8 +267,8 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "H3StoryDirectorList": "H3 Story Director List (工作台)",
-    "H3StoryDirectorConditioning": "H3 Story Director Conditioning",
-    "H3StoryDirectorChain": "H3 Story Director Chain",
-    "H3StoryDirectorLatentTemplate": "H3 Story Director Latent Template",
+    "H3StoryDirectorList": "H3 Scene Director List (工作台)",
+    "H3StoryDirectorConditioning": "H3 Scene Director Conditioning",
+    "H3StoryDirectorChain": "H3 Scene Director Chain",
+    "H3StoryDirectorLatentTemplate": "H3 Scene Director Latent Template",
 }

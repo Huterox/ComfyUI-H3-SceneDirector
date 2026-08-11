@@ -1,11 +1,13 @@
-"""StoryDirector 循环引擎：增量重渲 + 运动上下文链接。
+"""SceneDirector 窗口衔接引擎：增量重渲 + 运动上下文链接。
 
-这里只做一件事——循环。每段的文本条件由上游节点在编码头备好，
+这里只做一件事——逐段衔接。每段的文本条件由上游节点在编码头备好，
 采样配置（sampler/sigmas/model 补丁/negative）全部来自接线；
 静态图表达不了的部分才留在这里：每段的运动上下文来自上一段的
 采样器输出这一顺序依赖，以及磁盘增量缓存。
 """
 
+import base64
+import io
 import logging
 import os
 import random
@@ -28,10 +30,12 @@ from ..core.motion_context import (apply_motion_context, trim_av,
 from . import payload as P
 from . import cache as C
 from .conditioning import build_cond, load_ref_image, encode_refs, MAX_REFS
+from .colorlock import stats as cl_stats, match_smooth as cl_match
 
 _LOG = logging.getLogger("h3_storydirector")
 
 PROGRESS_EVENT = "h3_storydirector_progress"
+STEP_EVENT = "h3_storydirector_step"   # 逐步实时预览
 
 
 class _BasicGuider(comfy.samplers.CFGGuider):
@@ -123,7 +127,8 @@ def encode_story(clip, vae, segments_raw, width, height, first_frame=None):
     return {"width": int(width), "height": int(height), "conds": conds}
 
 
-def _sample(model, positive, latent, seed, sampler, sigmas, negative=None, cfg=1.0):
+def _sample(model, positive, latent, seed, sampler, sigmas, negative=None, cfg=1.0,
+            live=None):
     latent2 = latent.copy()
     latent_image = comfy.sample.fix_empty_latent_channels(model, latent2["samples"], None, None)
     latent2["samples"] = latent_image
@@ -137,7 +142,27 @@ def _sample(model, positive, latent, seed, sampler, sigmas, negative=None, cfg=1
         guider.set_cfg(float(cfg))
 
     noise = comfy.sample.prepare_noise(latent_image, seed)
-    callback = latent_preview.prepare_callback(model, sigmas.shape[-1] - 1)
+    # 与 latent_preview.prepare_callback 等价：原生进度条 + 预览字节照旧，
+    # 另外把"中段时间步"的 latent→RGB 投影经 live 回调推给工作台做逐步预览
+    # （线性投影零 VAE 开销；窗口头部是上一段的钉帧上下文，中段才是新内容）
+    previewer = latent_preview.get_previewer(model.load_device, model.model.latent_format)
+    pbar = comfy.utils.ProgressBar(int(sigmas.shape[-1] - 1))
+
+    def callback(step, x0, x, total_steps):
+        xx = x0.tensors[0] if getattr(x0, "is_nested", False) else x0
+        preview_bytes = None
+        if previewer is not None:
+            preview_bytes = previewer.decode_latent_to_preview_image("JPEG", xx)
+        pbar.update_absolute(step + 1, total_steps, preview_bytes)
+        if live is not None and previewer is not None:
+            try:
+                t = int(xx.shape[2]) if xx.ndim == 5 else 1
+                mid = xx[:, :, t // 2: t // 2 + 1] if xx.ndim == 5 else xx
+                live(int(step), int(total_steps),
+                     previewer.decode_latent_to_preview(mid))
+            except Exception:
+                pass   # 预览失败绝不拖垮采样
+
     samples = guider.sample(noise, latent_image, sampler, sigmas,
                             denoise_mask=None, callback=callback,
                             disable_pbar=not comfy.utils.PROGRESS_BAR_ENABLED,
@@ -152,7 +177,7 @@ def _sample(model, positive, latent, seed, sampler, sigmas, negative=None, cfg=1
 def run_chain(model, vae, audio_vae, segments_raw, story_cond, sampler, sigmas,
               width, height, seed, context_length, audio_context_length,
               encode_mode, anchor_mode, audio_mode, crop, cfg, cache_tag,
-              uniform_window=False, negative=None):
+              uniform_window=False, color_lock=False, negative=None):
     """链条主循环：缓存命中段直接解码，自第一个变动段起级联重渲。
     返回 (images, audio, contact_sheet, info)。"""
     run, run_nonce, global_prompt, globals_rows, assets, segs = P.parse_payload(segments_raw)
@@ -285,11 +310,35 @@ def run_chain(model, vae, audio_vae, segments_raw, story_cond, sampler, sigmas,
                 "run": run, "segment": i + 1, "total": len(segs),
                 "cached": first_dirty})
             seg_seed = (base_seed + i) & 0xffffffffffffffff
+
+            def _live(step, total_steps, img, _i=i):
+                # 逐步实时预览：投影小图放大到顺手尺寸，JPEG base64 推给工作台
+                try:
+                    w, h = img.size
+                    sc = 240.0 / max(1, w)
+                    img = img.resize((max(1, round(w * sc)), max(1, round(h * sc))))
+                    buf = io.BytesIO()
+                    img.save(buf, "JPEG", quality=70)
+                    PromptServer.instance.send_sync(STEP_EVENT, {
+                        "run": run, "segment": _i + 1, "total": len(segs),
+                        "step": step + 1, "steps": total_steps,
+                        "image": base64.b64encode(buf.getvalue()).decode("ascii")})
+                except Exception:
+                    pass
+
             latent = _sample(model, positive, latent_in, seg_seed,
-                             sampler, sigmas, negative, cfg)
+                             sampler, sigmas, negative, cfg, live=_live)
             imgs, aud = decode_av(vae, audio_vae, latent["samples"])
 
         out_imgs, out_aud = delivered_view(imgs, aud, trim, seg["duration"])
+        # 颜色锁定：第 1 段的交付视图自身作为统计参考，后续段在交付前
+        # 按通道对齐整段均值/方差，压制逐段独立渲染的白平衡/曝光漂移。
+        # 校正后的交付像素同时充当连续性锚点，下一段的运动上下文也受益
+        if color_lock:
+            if i == 0:
+                cl_ref = cl_stats(out_imgs)
+            else:
+                out_imgs = cl_match(out_imgs, *cl_ref)
         # 运动上下文锚在"实际交付"的尾部：网格盈余尾巴退出连续链，
         # 交付时间线的接缝才没有洞
         prev_images = out_imgs
@@ -297,10 +346,12 @@ def run_chain(model, vae, audio_vae, segments_raw, story_cond, sampler, sigmas,
 
         base = "seg_%04d" % (i + 1)
         if cached_hit:
-            # 命中段缺了可看工件就补上，不动 latent
-            if not os.path.isfile(os.path.join(rd, "posters", base + ".jpg")):
+            # 命中段缺了可看工件就补上，不动 latent；校色开关与缓存
+            # 状态不一致时重存可看工件（校色不动 latent，无需重渲）
+            refresh = i > 0 and bool(meta.get("color_lock")) != bool(color_lock)
+            if refresh or not os.path.isfile(os.path.join(rd, "posters", base + ".jpg")):
                 C.save_segment(rd, i, None, out_imgs, out_aud, poster_only=True)
-            if not os.path.isfile(os.path.join(rd, base + ".mp4")):
+            if refresh or not os.path.isfile(os.path.join(rd, base + ".mp4")):
                 video_obj = InputImpl.VideoFromComponents(
                     Types.VideoComponents(images=out_imgs, audio=out_aud,
                                           frame_rate=Fraction(P.FPS)))
@@ -320,13 +371,20 @@ def run_chain(model, vae, audio_vae, segments_raw, story_cond, sampler, sigmas,
             "hash": hashes[i], "frames": frames, "seed": seg_seed, "trim": trim,
             "poster_file": base + ".jpg", "mp4_file": base + ".mp4",
         })
+        tag = "缓存" if cached_hit else "新渲染"
+        if color_lock and i > 0:
+            tag += "·校色"
         info_lines.append(
             "段 %d: %d 帧 / %.2fs, seed %d, trim %d, 音画漂移 %.1fms [%s]"
             % (i + 1, frames, frames / float(P.FPS), seg_seed, trim, drift,
-               "缓存" if cached_hit else "新渲染"))
+               tag))
 
-    C.save_meta(rd, C.new_meta(run, g_hash, global_prompt, globals_rows,
-                               P.assets_fp(assets), base_seed, seg_meta))
+    meta_out = C.new_meta(run, g_hash, global_prompt, globals_rows,
+                          P.assets_fp(assets), base_seed, seg_meta)
+    # 记录校色开关状态：缓存段的可看工件是按这个状态落盘的，
+    # 下次开关翻转时据此重存工件（不动 latent，不重渲）
+    meta_out["color_lock"] = bool(color_lock)
+    C.save_meta(rd, meta_out)
 
     total_frames = sum(int(t.shape[0]) for t in all_images)
     header = ("运行 %r: %d 段 (%d 新渲染 / %d 缓存), base_seed %d, 共 %d 帧 / %.2fs"

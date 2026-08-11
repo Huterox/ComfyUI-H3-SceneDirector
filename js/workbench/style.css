@@ -20,7 +20,7 @@
 .h3wb * { box-sizing: border-box; }
 .h3wb button { font: inherit; cursor: pointer; }
 .h3wb input, .h3wb textarea, .h3wb select { font: inherit; color: var(--text); }
-.h3wb-scroll { flex: 1; min-height: 0; overflow-y: auto; }
+.h3wb-scroll { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
 .h3wb-scroll::-webkit-scrollbar { width: 8px; }
 .h3wb-scroll::-webkit-scrollbar-thumb { background: #3a3a3d; border-radius: 4px; }
 
@@ -42,11 +42,11 @@
 
 /* ---------- 预览区 ---------- */
 .h3wb-stage { display: flex; gap: 12px; padding: 12px; flex: none; }
-.h3wb-screen { width: 46%; max-width: 480px; aspect-ratio: 16/9; background: #000;
+.h3wb-screen { width: 46%; aspect-ratio: 16/9; background: #000;
     border: 1px solid var(--line); border-radius: 6px; overflow: hidden;
     position: relative; flex: none; }
 .h3wb-screen img, .h3wb-screen video { width: 100%; height: 100%;
-    object-fit: cover; display: block; }
+    object-fit: contain; display: block; }
 .h3wb-empty { width: 100%; height: 100%; display: flex; align-items: center;
     justify-content: center; color: #555; font-size: 13px; }
 .h3wb-play { position: absolute; inset: 0; display: flex; align-items: center;
@@ -81,7 +81,7 @@
 .h3wb-seg { position: relative; flex: none; height: 96px; border-radius: 6px;
     overflow: hidden; background: #2a2a2d; border: 1px solid var(--line);
     cursor: pointer; padding: 0; }
-.h3wb-seg img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.h3wb-seg img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .h3wb-seg:hover { border-color: #555; }
 .h3wb-seg.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .h3wb-seg-empty { width: 100%; height: 100%; display: flex; align-items: center;
@@ -98,7 +98,8 @@
 .h3wb-segadd:hover { color: var(--accent); border-color: var(--accent); }
 
 /* ---------- 详情面板 ---------- */
-.h3wb-detail { display: flex; gap: 12px; padding: 10px 12px 12px;
+.h3wb-detail { display: flex; gap: 12px; padding: 10px 12px 12px; flex: 1 0 auto;
+    min-height: 150px;
     border-top: 1px solid var(--line); background: var(--panel2); }
 .h3wb-prompt { flex: 1; background: #171718; border: 1px solid var(--line);
     border-radius: 6px; padding: 8px; min-height: 96px; resize: vertical;
@@ -159,7 +160,7 @@
     display: flex; flex-direction: column; gap: 4px; }
 .h3wb-card-thumb { width: 100%; aspect-ratio: 16/10; background: #171718;
     border-radius: 4px; overflow: hidden; position: relative; cursor: pointer; }
-.h3wb-card-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.h3wb-card-thumb img { width: 100%; height: 100%; object-fit: contain; }
 .h3wb-card-nothumb { display: flex; align-items: center; justify-content: center;
     color: #555; font-size: 10px; text-align: center; white-space: pre-line; }
 .h3wb-card-thumb.h3wb-drop, .h3wb-addcard.h3wb-drop { border-color: var(--accent); }
@@ -177,4 +178,69 @@
 .h3wb-pbar { flex: 1; height: 5px; background: #2a2a2d; border-radius: 3px; overflow: hidden; }
 .h3wb-pbar u { display: block; height: 100%; width: 0; background: var(--accent);
     border-radius: 3px; transition: width .3s; }
+
+/* ---------- 素材缩略图操作菜单 / 放大查看 ---------- */
+.h3wb-thumbmenu { position: absolute; left: 4px; bottom: 4px; z-index: 40; min-width: 96px;
+    background: #1c1c1e; border: 1px solid var(--line); border-radius: 6px;
+    box-shadow: 0 6px 18px rgba(0,0,0,.5); padding: 4px; }
+.h3wb-thumbmenu button { display: block; width: 100%; background: none; border: none;
+    color: var(--text); padding: 4px 8px; border-radius: 4px; text-align: left; font-size: 11px; }
+.h3wb-thumbmenu button:hover { background: #2d2d30; }
+.h3wb-lightbox { position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,.85);
+    display: flex; align-items: center; justify-content: center; cursor: zoom-out; }
+.h3wb-lightbox img { max-width: 92vw; max-height: 92vh; object-fit: contain;
+    border-radius: 6px; box-shadow: 0 8px 40px rgba(0,0,0,.8); }
+.h3wb-lightbox span { position: fixed; right: 18px; top: 12px; color: #bbb; font-size: 26px; }
+.h3wb-lightbox span:hover { color: #fff; }
+.h3wb-lightbox video { max-width: 92vw; max-height: 92vh; border-radius: 6px;
+    box-shadow: 0 8px 40px rgba(0,0,0,.8); }
+/* 预览窗右上角的放大播放钮（压在整幅播放键之上，需要 z-index） */
+.h3wb-zoom { position: absolute; right: 6px; top: 6px; z-index: 5; width: 26px; height: 26px;
+    border-radius: 5px; background: rgba(0,0,0,.55); border: 1px solid var(--line);
+    color: var(--accent2); font-size: 14px; line-height: 1; padding: 0; }
+.h3wb-zoom:hover { background: rgba(0,0,0,.8); border-color: var(--accent2); }
+
+/* ---------- 等比缩放层（容器查询单位：1cqw = 工作台宽度的 1%） ----------
+   用户要的真·等比：组件尺寸随节点宽度线性伸缩。不用 zoom（渲染会被
+   前端布局甩出节点），也不用 JS 逐件换算——cqw 由 CSS 在容器内
+   自行解析，永不溢出。基准 = 设计稿 920px 宽（该处 1cqw ≈ 9.2px）。 */
+.h3wb { container-type: inline-size; }
+.h3wb-bar, .h3wb-status, .h3wb-btn, .h3wb-run, .h3wb-durinput, .h3wb-fold,
+.h3wb-dside, .h3wb-setrow, .h3wb-cards, .h3wb-acts { font-size: 1.30cqw; }
+.h3wb-empty { font-size: 1.41cqw; }
+.h3wb-segadd { font-size: 2.17cqw; }
+.h3wb-pinadd { font-size: 1.74cqw; }
+.h3wb-x { font-size: 1.52cqw; }
+.h3wb-bar { padding: 0.87cqw 1.30cqw; }
+.h3wb-run { width: 16.3cqw; padding: 0.33cqw 0.87cqw; }
+.h3wb-btn { padding: 0.33cqw 1.09cqw; }
+.h3wb-stage { padding: 1.30cqw; gap: 1.30cqw; }
+.h3wb-segtitle { font-size: 1.52cqw; }
+.h3wb-tag { font-size: 1.20cqw; }
+.h3wb-play span { width: 4.78cqw; height: 4.78cqw; font-size: 1.74cqw; }
+.h3wb-zoom { width: 2.83cqw; height: 2.83cqw; font-size: 1.52cqw; }
+.h3wb-livetag { font-size: 1.09cqw; }
+.h3wb-ruler { font-size: 1.09cqw; height: 1.96cqw; }
+.h3wb-seg { height: 10.43cqw; }
+.h3wb-segno, .h3wb-segdur { font-size: 1.09cqw; }
+.h3wb-seg-empty { font-size: 1.20cqw; }
+.h3wb-prompt { font-size: 1.25cqw; }
+.h3wb-label { font-size: 1.20cqw; }
+.h3wb-hint, .h3wb-kv { font-size: 1.20cqw; }
+.h3wb-card { width: 16.3cqw; }
+.h3wb-card-cat, .h3wb-card-name, .h3wb-card-note { font-size: 1.20cqw; }
+.h3wb-card-nothumb { font-size: 1.09cqw; }
+.h3wb-pord { font-size: 1.09cqw; }
+.h3wb-pin, .h3wb-pinadd { width: 4.78cqw; height: 4.78cqw; }
+.h3wb-thumbmenu button { font-size: 1.20cqw; }
+.h3wb-fold summary, .h3wb-sec-label { font-size: 1.20cqw; }
+.h3wb-topwrap { flex: none; }
+.h3wb-topwrap.sized { overflow-y: auto; }
+.h3wb-vsplit { width: 8px; flex: none; cursor: col-resize; border-radius: 4px; }
+.h3wb-vsplit:hover, .h3wb-vsplit.on { background: #2d2d30; }
+.h3wb-hsplit { height: 8px; flex: none; cursor: row-resize; }
+.h3wb-hsplit:hover { background: #2d2d30; }
+.h3wb-live { width: 100%; height: 100%; object-fit: contain; display: block; background: #000; }
+.h3wb-livetag { position: absolute; left: 6px; top: 6px; background: rgba(0,0,0,.62);
+    color: var(--accent2); padding: 1px 6px; border-radius: 4px; }
 .h3wb-pct { min-width: 36px; text-align: right; }

@@ -85,7 +85,7 @@ export function attachWorkbench(node, { app, api }) {
 
     // 工具条
     const bar = el("div", "h3wb-bar");
-    bar.appendChild(el("span", "h3wb-logo", "StoryDirector"));
+    bar.appendChild(el("span", "h3wb-logo", "SceneDirector"));
     bar.appendChild(el("span", "lbl", "场景"));
     const runInput = el("input", "h3wb-run");
     runInput.type = "text";
@@ -130,8 +130,33 @@ export function attachWorkbench(node, { app, api }) {
         onStatus: (res) => { timeline.applyStatus(res); stage.applyStatus(res); },
     });
 
-    root.appendChild(stage.element);
-    root.appendChild(timeline.element);
+    // 上半区（预览 + 时间线）与滚动区之间：横向分隔条，拖拽分配高度
+    const topwrap = el("div", "h3wb-topwrap");
+    topwrap.appendChild(stage.element);
+    topwrap.appendChild(timeline.element);
+    root.appendChild(topwrap);
+
+    const hsplit = el("div", "h3wb-hsplit");
+    hsplit.title = "拖拽调整预览/时间线区的高度";
+    root.appendChild(hsplit);
+    hsplit.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+        hsplit.setPointerCapture(e.pointerId);
+        const y0 = e.clientY;
+        const h0 = topwrap.getBoundingClientRect().height;
+        const rootH = root.getBoundingClientRect().height;
+        const move = (ev) => {
+            const h = Math.min(rootH - 280, Math.max(220, h0 + ev.clientY - y0));
+            topwrap.classList.add("sized");
+            topwrap.style.height = Math.round(h) + "px";
+        };
+        const up = () => {
+            hsplit.removeEventListener("pointermove", move);
+            hsplit.removeEventListener("pointerup", up);
+        };
+        hsplit.addEventListener("pointermove", move);
+        hsplit.addEventListener("pointerup", up);
+    });
 
     // 滚动区：详情面板 + 折叠的设定表/资产卡（高度不够时这里滚）
     const scroller = el("div", "h3wb-scroll");
@@ -246,8 +271,19 @@ export function attachWorkbench(node, { app, api }) {
     //   * 宽度：前端会量一次元素宽并钉成内联值（prepareElement），
     //     所以由我们显式钉成 节点宽-边距，并挂 afterResize 随拖动同步。
     //   不覆写 computeSize，不调 setSize 改高度，不要 ResizeObserver。
+    // 节点最小尺寸：比这更小工作台就没法用了，拖过线直接钳住
+    const MIN_NODE_W = 880, MIN_NODE_H = 660;
+    const origOnResize = node.onResize;
+    node.onResize = function (size) {
+        size[0] = Math.max(size[0], MIN_NODE_W);
+        size[1] = Math.max(size[1], MIN_NODE_H);
+        return origOnResize?.apply(this, arguments);
+    };
     const HMARGIN = 10;   // DOMWidgetImpl.DEFAULT_MARGIN
     const syncWidth = () => {
+        // 尺寸契约不碰 zoom（前端按自己的规则给 widget 分高，zoom 会把
+        // 渲染甩出节点）。组件跟随节点靠流体布局：预览窗宽百分比 +
+        // aspect-ratio 跟宽走，详情区 flex 跟高走，永不溢出。
         root.style.width = Math.max((node.size?.[0] || 920) - HMARGIN * 2, 600) + "px";
     };
     const domWidget = node.addDOMWidget("h3_workbench", "div", root, {
@@ -283,7 +319,19 @@ export function attachWorkbench(node, { app, api }) {
             progress.refreshSoon();
         }
     });
-    const offExecEnd = backend.onExecutionEnd(() => progress.onDone());
+    const offStep = backend.onStep((d) => {
+        if (d.run && d.run !== resolveRun()) return;
+        const i = (d.segment || 0) - 1;
+        // 跟随正在渲染的段；用户正在输入时不抢焦点
+        const ae = document.activeElement;
+        const typing = ae && (ae.tagName === "TEXTAREA" || ae.tagName === "INPUT");
+        if (!typing && i !== selected) { selected = i; refreshSelection(); }
+        stage.showLive(d);
+    });
+    const offExecEnd = backend.onExecutionEnd(() => {
+        stage.clearLive();
+        progress.onDone();
+    });
 
     // --- 对外实例接口（入口经 node._h3wb 调用） ------------------------------
     function loadFromValue(v) {
@@ -295,6 +343,7 @@ export function attachWorkbench(node, { app, api }) {
 
     function dispose() {
         offProgress();
+        offStep();
         offExecEnd();
         progress.dispose();
         detail.dispose();

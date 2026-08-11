@@ -1,16 +1,31 @@
-# ComfyUI-H3-StoryDirector
+# ComfyUI-H3-SceneDirector
 
-MiniMax H3 的导演工作台：以"场景 / 动作"的心智模型做长视频——一次 run 是一个**场景**（物理上是连续镜头），每段是场景里的一个**动作**。逐段增量渲染，段间用**运动上下文**真正延续画面与声音。
+MiniMax H3 的**场景导演**工作台：以"场景 / 动作"的心智模型做长视频——一次 run 是一个**场景**（物理上是连续镜头），每段是场景里的一个**动作**。逐段增量渲染，段间用**特征上下文窗口衔接技术**真正延续画面与声音。
 
 ![工作台界面](docs/workbench.png)
 
+## 分层模型：故事 / 场景 / 动作
+
+```
+故事（Story） = N 个场景的硬切组接        ← 路线图上的上层（见下）
+场景（Scene） = 一个 run，窗口衔接保连续   ← 本包的内核
+动作（Action）= 一个 segment              ← 工作台时间线上的一张分镜卡
+```
+
+电影语言里场景之间本来就该**硬切**——跨场景走 latent 连续反而是错的（谁也不希望竹林渐变进装配舱）。所以场景级连续性（我们的内核）和故事级组接（合片）是两个问题，本包先把前者做到位。
+
+**当前版本定位：场景级工作台。** 故事级编排（多场景管理、跨场景资产复用、硬切合片导出）在路线图上。
+
+> 兼容说明：节点类 ID 保持 `H3StoryDirector*` 不变，存量工作流不受影响；从 StoryDirector 时代升级的请先删除旧包目录再装（类 ID 相同，同装会冲突）。
+
 ## 特性
 
-- **分镜时间线工作台**（`H3StoryDirectorList` 节点）：场景设定表、资产卡（角色/场景/物品，图片自动编号 `<Picture N>` 注入每段条件）、胶片分镜轨道（缩略图、缓存状态徽标、单段重摇、排序、段内视频点播）、实时渲染进度
-- **运动上下文链接**：上一段尾部最多 39 帧作为永不去噪的条件块钉进下一段时间轴——模型读到的是真实的**运动**而不是一张末帧静照；尾部声音钉在同一条时间轴上，相位级延续（详见下文实现原理）
+- **分镜时间线工作台**（`H3StoryDirectorList` 节点）：场景设定表、资产卡（角色/场景/物品，图片自动编号 `<Picture N>` 注入每段条件）、胶片分镜轨道（缩略图、缓存状态徽标、单段重摇、排序、段内视频点播）、实时渲染进度、逐步实时预览（latent 投影，零解码开销）、可拉拽布局
+- **特征上下文窗口衔接**（运动上下文链接）：上一段交付尾部最多 39 帧经 VAE 压成 latent 特征窗口，作为永不去噪的条件块钉进下一段时间轴——模型读到的是真实的**运动**而不是一张末帧静照；尾部声音钉在同一条时间轴上，相位级延续（详见下文实现原理）
 - **增量重渲**：每段缓存到 `output/h3_storydirector/<run>/`（AV latent + mp4 + 海报），内容寻址：改哪段渲哪段，第一个变动段之后级联；改全局设定/资产全链重渲
 - **反上帝节点**：采样完全走接线——`model`（可串 Spectrum 等补丁）、`sampler`、`sigmas`、可选 `negative`+`cfg`。文本编码在独立的编码头里完成，CLIP 层优化随意插
 - **精确时长**：写 5s 交付 5s。VAE 网格对齐产生的盈余帧只参与下一段的上下文，交付按设定帧数裁切，连续性锚定在实际交付的尾部——接缝无洞
+- **颜色锁定**（可选）：逐帧滑动统计校色，压制逐段独立渲染的白平衡/曝光漂移；锁机位恒定光照的片子（口播/装配）建议开，光照需要渐变的片子请关
 - 与同生态旧包同装时补丁带认领养守卫，不会叠加
 
 ## 运动上下文（Motion Context）实现原理
@@ -53,20 +68,24 @@ H3 的 DiT 把所有内容打包进一条序列：文本行 / 条件行（关键
 
 每段渲染产物落盘 `output/h3_storydirector/<run>/`（无损 AV latent + mp4 + 海报 + meta.json）。段指纹 = 序号 + 时长 + 提示词 + nonce + 段级资产指纹；全局指纹 = 设定表 + 资产文件 sha1 + 采样指纹（sampler 名 + sigmas 哈希 + negative/cfg）+ 显式 seed + cache_tag。自第一个变动段起级联重渲（后段钉前段的尾帧，前段变则后段条件变），未变段直接读盘——改第 8 段只重渲 8 到 N。
 
+### 颜色锁定（storyline/colorlock.py）
+
+逐段独立渲染时，模型会对曝光与白平衡做微小的重新决策，多段串联累积成可见的变色。开启 `color_lock` 后，每段交付前按**逐帧滑动统计**对齐到第 1 段：增益整段对齐对比度，偏移按每帧均值的滑动平均逐帧钉参考——窗口（~0.5s）内的动作内容原样通过，窗口外的慢漂移压平，接缝两侧统计天然连续。
+
 ## 节点
 
 | 节点 | 职责 |
 |---|---|
-| H3 Story Director List | 工作台载体：场景设定表 + 资产卡 + 分镜时间线 |
-| H3 Story Director Conditioning | 逐段条件编码（CLIP/VAE 接线，明面可见可 hack） |
-| H3 Story Director Chain | 纯循环引擎：钉帧 → 采样 → 解码 → 缓存 → 拼接 |
-| H3 Story Director Latent Template | 统一渲染窗口的空 AV latent（MultiRate 类采样器用） |
+| H3 Scene Director List | 工作台载体：场景设定表 + 资产卡 + 分镜时间线 |
+| H3 Scene Director Conditioning | 逐段条件编码（CLIP/VAE 接线，明面可见可 hack） |
+| H3 Scene Director Chain | 特征上下文窗口衔接引擎：钉帧 → 采样 → 解码 → 缓存 → 拼接 |
+| H3 Scene Director Latent Template | 统一渲染窗口的空 AV latent（MultiRate 类采样器用） |
 
 ## 安装
 
 ```bash
 cd ComfyUI/custom_nodes
-git clone https://github.com/Huterox/ComfyUI-H3-StoryDirector
+git clone https://github.com/Huterox/ComfyUI-H3-SceneDirector
 # 重启 ComfyUI
 ```
 
@@ -91,6 +110,7 @@ git clone https://github.com/Huterox/ComfyUI-H3-StoryDirector
 ```bash
 python tests/test_patch_layout.py  # 布局补丁语义（纯 CPU 离线）
 python tests/test_smoke.py         # 节点注册 + 运动上下文 + 裁剪（纯 CPU 离线）
+python tests/test_colorlock.py     # 颜色锁定（纯 CPU 离线）
 ```
 
 ## 许可
