@@ -1,7 +1,7 @@
 {
- "id": "h3sd-rv2v",
+ "id": "h3sd-scenedirector_workbench",
  "revision": 0,
- "last_node_id": 13,
+ "last_node_id": 14,
  "last_link_id": 20,
  "nodes": [
   {
@@ -24,7 +24,7 @@
     "Node name for S&R": "UNETLoader"
    },
    "widgets_values": [
-    "minimax_h3_ref2va_pruned_int8_convrot.safetensors",
+    "minimax_h3_fl2va_pruned_int8_convrot.safetensors",
     "default"
    ]
   },
@@ -192,8 +192,8 @@
     "Node name for S&R": "H3SceneDirectorList"
    },
    "widgets_values": [
-    "{\n \"run\": \"demo_rv2v\",\n \"run_nonce\": 0,\n \"global_prompt\": \"\",\n \"globals\": [],\n \"assets\": [\n  {\n   \"category\": \"角色\",\n   \"name\": \"目标主体\",\n   \"image\": \"subject.png\",\n   \"subfolder\": \"\",\n   \"note\": \"替换为你的参考主体\",\n   \"kind\": \"image\"\n  }\n ],\n \"segments\": [\n  {\n   \"duration\": 5.0,\n   \"prompt\": \"Restyle <Video 1> with the subject identity of <Picture 1>: keep the source motion and camera, but the protagonist becomes <Picture 1> with consistent face and outfit. Audio: regenerate a matching ambient soundscape.\",\n   \"nonce\": \"\",\n   \"assets\": [],\n   \"enabled\": true,\n   \"first_frame\": null,\n   \"last_frame\": null,\n   \"source\": {\n    \"video\": \"source.mp4\",\n    \"subfolder\": \"\",\n    \"start\": 0.0,\n    \"end\": 5.0\n   },\n   \"audio_mode\": \"generate\"\n  }\n ]\n}",
-    "demo_rv2v"
+    "{\n \"run\": \"demo\",\n \"run_nonce\": 0,\n \"global_prompt\": \"\",\n \"globals\": [],\n \"assets\": [],\n \"segments\": [\n  {\n   \"duration\": 5.0,\n   \"prompt\": \"Realistic live-action cinematic look: a post-rain dusk metropolis, anamorphic lens, shallow depth of field, film grain, city volumetric fog, flying-car traffic between towers.\\n\\nStoryboard:\\n[0s-2s] High side angle: protagonist sprinting at a roof edge, wind catching their coat.\\n[2s-3.5s] Leap across the gap between buildings, body stretching mid-air.\\n[3.5s-5s] Landing and roll, low-angle shot, keep running into fog.\\n\\nAudio: wind, rapid footsteps, city ambience, low score with accent hits on each leap.\\nNo text, logos or watermarks.\",\n   \"nonce\": \"\",\n   \"assets\": [],\n   \"enabled\": true,\n   \"first_frame\": null,\n   \"last_frame\": null,\n   \"source\": null,\n   \"audio_mode\": \"generate\"\n  }\n ]\n}",
+    "demo"
    ]
   },
   {
@@ -303,7 +303,7 @@
     "Node name for S&R": "SaveVideo"
    },
    "widgets_values": [
-    "video/H3SceneDirector_rv2v",
+    "video/H3SceneDirector_scenedirector_workbench",
     "auto",
     "auto"
    ]
@@ -328,6 +328,29 @@
     "Node name for S&R": "PreviewAny"
    },
    "widgets_values": []
+  },
+  {
+   "id": 14,
+   "type": "MarkdownNote",
+   "pos": [
+    520,
+    320
+   ],
+   "size": [
+    520,
+    260
+   ],
+   "flags": {},
+   "order": 0,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [],
+   "properties": {
+    "Node name for S&R": "MarkdownNote"
+   },
+   "widgets_values": [
+    "## SceneDirector 全能工作台\n\n- 任务模式在**工作台段卡片**里按段选择：t2v/i2v/fl2v/r2v/v2v/rv2v\n- r2v/v2v/rv2v 时把 **UNETLoader** 文件换成 `minimax_h3_ref2va_pruned_int8_convrot.safetensors`\n- fl2v：段卡片上传首/尾帧；r2v：资产卡挂参考（图/视频/音频）；v2v：源视频面板上传+智能分镜\n- 衔接/接缝渐变默认开；锁机位片建议勾 Chain 的 color_lock\n- 占位素材（subject.png / source.mp4 / fl2v_first.png / fl2v_last.png）自行替换"
+   ]
   }
  ],
  "links": [
