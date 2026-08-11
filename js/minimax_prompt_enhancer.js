@@ -300,7 +300,7 @@ export function mountPromptEnhancerPanel(editor, parentEl) {
     keyRow.appendChild(el({}, "API Key:", "span")).className = "minimax-pe-label";
     pe.apiKeyInput = document.createElement("input");
     pe.apiKeyInput.type = "password";
-    pe.apiKeyInput.placeholder = "智谱 API Key";
+    pe.apiKeyInput.placeholder = "OpenAI 兼容 API Key（本地可空）";
     pe.apiKeyInput.autocomplete = "off";
     pe.apiKeyInput.className = "minimax-pe-input";
     Object.assign(pe.apiKeyInput.style, { flex: "1" });
@@ -452,12 +452,14 @@ export function mountPromptEnhancerPanel(editor, parentEl) {
     pe.updateApiFormatUI = () => {
         const fmt = pe.apiSelect.value;
         const isOpenAi = fmt === API_OPENAI_COMPAT;
-        const showKey = fmt === API_ZHIPU || isOpenAi;
+        const showKey = fmt === API_ZHIPU || isOpenAi || fmt === API_ANTHROPIC;
         const supportsUnload = pe.supportsUnload();
         if (pe.compatRow) pe.compatRow.style.display = isOpenAi ? "flex" : "none";
         if (pe.keyRow) pe.keyRow.style.display = showKey ? "flex" : "none";
         if (pe.apiKeyInput) {
-            pe.apiKeyInput.placeholder = fmt === API_ZHIPU ? "智谱 API Key" : "OpenAI / llama-swap API Key（可选）";
+            pe.apiKeyInput.placeholder = fmt === API_ANTHROPIC
+                ? "Anthropic API Key（必填）"
+                : "OpenAI 兼容 API Key（本地可空）";
         }
         if (pe.unloadWrap) pe.unloadWrap.style.display = supportsUnload ? "flex" : "none";
         if (pe.unloadBtnRow) pe.unloadBtnRow.style.display = supportsUnload ? "flex" : "none";
