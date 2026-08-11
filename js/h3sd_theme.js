@@ -12,26 +12,72 @@ function polish(node) {
     if (!ed || node._h3sdThemed) return;
     node._h3sdThemed = true;
     try {
-        // 增强结果应用修复：先把文本写进批量卡的 DOM 文本框，
-        // 再走原 apply——否则 commit 的 flushBatchPromptInputs 会
-        // 用卡里的旧草稿把刚应用的增强结果覆盖回去
+        // 增强结果：预览 -> 确认才应用（扩写当前）。
+        // apply 前先把文本写进批量卡 DOM——否则 commit 的
+        // flushBatchPromptInputs 会用卡里的旧草稿把结果覆盖回去
         const pe = ed._promptEnhancer;
         if (pe && !pe._h3sdApplyFixed) {
             pe._h3sdApplyFixed = true;
             const origApply = pe.setActivePromptText?.bind(pe);
+            const applyText = (text) => {
+                try {
+                    const idx = ed.selectedIndex ?? 0;
+                    const ta = ed.batchList?.querySelector(
+                        `textarea[data-batch-prompt-index="${idx}"]`);
+                    if (ta) {
+                        ta.value = text;
+                        ta.dispatchEvent(new Event("input"));
+                    }
+                } catch (e) { /* 忽略，走原路径 */ }
+                return origApply(text);
+            };
+            // 预览块（增强面板顶部）
+            const box = document.createElement("div");
+            box.className = "h3sd-pe-preview hidden";
+            const pre = document.createElement("pre");
+            const head = document.createElement("div");
+            head.className = "h3sd-pe-preview-head";
+            head.textContent = "结果预览 · 确认后应用";
+            const btns = document.createElement("div");
+            btns.className = "h3sd-pe-preview-btns";
+            box.appendChild(head);
+            box.appendChild(pre);
+            box.appendChild(btns);
+            let pending = null;
+            const hide = () => { box.classList.add("hidden"); pending = null; };
+            const mk = (label, cls, fn) => {
+                const b = document.createElement("button");
+                b.className = cls;
+                b.textContent = label;
+                b.addEventListener("click", fn);
+                btns.appendChild(b);
+                return b;
+            };
+            mk("应用", "h3sd-btn-primary", () => {
+                if (pending != null) applyText(pending);
+                hide();
+            });
+            mk("复制", "h3sd-btn", () => {
+                if (pending != null) navigator.clipboard?.writeText(pending);
+            });
+            mk("丢弃", "h3sd-btn danger", hide);
+            pe.body?.insertBefore(box, pe.body.firstChild);
             if (origApply) {
                 pe.setActivePromptText = (text) => {
-                    try {
-                        const idx = ed.selectedIndex ?? 0;
-                        const ta = ed.batchList?.querySelector(
-                            `textarea[data-batch-prompt-index="${idx}"]`);
-                        if (ta) {
-                            ta.value = text;
-                            ta.dispatchEvent(new Event("input"));
-                        }
-                    } catch (e) { /* 忽略，走原路径 */ }
-                    return origApply(text);
+                    if (pe._h3sdPreviewNext) {
+                        pe._h3sdPreviewNext = false;
+                        pending = text;
+                        pre.textContent = text;
+                        box.classList.remove("hidden");
+                        return;
+                    }
+                    return applyText(text);
                 };
+                // 「扩写当前」走预览；「扩写全部」逐段直接应用
+                const cur = pe.enhanceCurrentBtn;
+                if (cur) {
+                    cur.addEventListener("click", () => { pe._h3sdPreviewNext = true; }, true);
+                }
             }
         }
         // 实时预览大屏提到主区最上方（我们旧工作台的位置）

@@ -215,3 +215,38 @@
     background: #232733; border: 1px solid #333a4d; color: var(--text); border-radius: 4px;
 }
 .bd-controls input[type="range"] { accent-color: var(--accent2); }
+
+/* 增强结果预览块 */
+.h3sd-pe-preview {
+    background: var(--screen, #0c0e13);
+    border: 1px solid #3a4265;
+    border-radius: 6px;
+    margin-bottom: 6px;
+}
+.h3sd-pe-preview.hidden { display: none; }
+.h3sd-pe-preview-head {
+    padding: 5px 10px;
+    font-size: 11px;
+    color: #9fd3ff;
+    border-bottom: 1px solid #262b38;
+}
+.h3sd-pe-preview pre {
+    margin: 0;
+    padding: 8px 10px;
+    max-height: 220px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #cfd3dd;
+}
+.h3sd-pe-preview-btns { display: flex; gap: 6px; padding: 0 10px 8px; }
+.h3sd-pe-preview-btns button {
+    background: #232733; color: #cfd3dd;
+    border: 1px solid #333a4d; border-radius: 4px;
+    padding: 3px 14px; cursor: pointer; font-size: 12px;
+}
+.h3sd-pe-preview-btns button:hover { background: #2b3040; }
+.h3sd-pe-preview-btns .h3sd-btn-primary { background: #2e6fd8; border-color: #2e6fd8; color: #fff; }
+.h3sd-pe-preview-btns .danger { color: #ff9d9d; }
