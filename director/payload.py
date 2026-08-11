@@ -367,3 +367,200 @@ def sampling_fp(sampler, sigmas, negative=None, cfg=1.0):
     if abs(float(cfg) - 1.0) > 1e-9:
         fp += "|cfg:%g" % float(cfg)
     return fp
+
+
+# ---------------------------------------------------------------------------
+# Director 时间轴（timeline_data v4）-> 本包载荷 的翻译层
+# ---------------------------------------------------------------------------
+
+def _task_key_from_label(value):
+    """'t2v — 文生视频(Text to Video)' -> 't2v'（对齐他们的 resolve_task_key）。"""
+    v = str(value or "").split(",[object Object]", 1)[0].strip()
+    if " · " in v:
+        v = v.split(" · ", 1)[0].strip()
+    for sep in (" — ", " —— ", " - ", " – "):
+        if sep in v:
+            return v.split(sep, 1)[0].strip()
+    return v or "t2v"
+
+
+def _d_ref_to_asset(item, kind, seen):
+    """Director 参考条目 {imageFile|videoFile|audioFile, subfolder} -> 资产卡。"""
+    if not isinstance(item, dict):
+        return None
+    rel = str(item.get("imageFile") or item.get("videoFile")
+               or item.get("audioFile") or item.get("fileName") or "").strip()
+    if not rel:
+        return None
+    card = {"category": "参考", "name": str(item.get("name", "") or "").strip()
+            or rel.rsplit("/", 1)[-1].rsplit(".", 1)[0],
+            "image": rel.replace("\\", "/"),
+            "subfolder": "", "note": "", "kind": kind}
+    # imageFile 带相对路径时拆出 subfolder（与输入目录约定一致）
+    if "/" in card["image"]:
+        card["subfolder"], card["image"] = card["image"].rsplit("/", 1)
+    key = (kind, card["subfolder"], card["image"])
+    if key in seen:
+        return None
+    seen.add(key)
+    return card
+
+
+def _d_frame_ref(item):
+    """Director 首尾帧引用 {imageFile, subfolder} -> {image, subfolder}。"""
+    if not isinstance(item, dict):
+        return None
+    rel = str(item.get("imageFile") or item.get("fileName") or "").strip()
+    if not rel:
+        return None
+    rel = rel.replace("\\", "/")
+    if "/" in rel:
+        sub, name = rel.rsplit("/", 1)
+        return {"image": name, "subfolder": sub}
+    return {"image": rel, "subfolder": ""}
+
+
+def parse_run_options(raw):
+    """run 级可选覆盖：continuity / context_length / audio_mode。
+    工作台（Director UI）写进载荷的控制项；None = 跟随 Chain 节点 widget。"""
+    try:
+        data = json.loads(raw or "{}")
+    except (json.JSONDecodeError, TypeError):
+        data = {}
+    if not isinstance(data, dict):
+        data = {}
+    cont = data.get("continuity", None)
+    ctx = data.get("context_length", None)
+    try:
+        ctx = int(ctx) if ctx is not None else None
+    except (TypeError, ValueError):
+        ctx = None
+    am = str(data.get("audio_mode", "") or "").strip().lower()
+    return {
+        "continuity": None if cont is None else bool(cont),
+        "context_length": ctx,
+        "audio_mode": am if am in AUDIO_MODES else None,
+    }
+
+
+def parse_director(timeline_data, task_type, global_prompt, run):
+    """把 Director UI 的 timeline_data(v4) 翻译成载荷段列表。
+
+    返回 (global_prompt_out, assets, segments, options)。
+    options = {"continuity","context_length","audio_mode"}（同 parse_run_options）。
+    """
+    try:
+        tl = json.loads(timeline_data or "{}")
+    except (json.JSONDecodeError, TypeError):
+        tl = {}
+    if not isinstance(tl, dict):
+        tl = {}
+    fps = float(tl.get("frameRate") or tl.get("frame_rate") or FPS)
+    g = tl.get("global") or {}
+    out = tl.get("output") or {}
+
+    gp = str(g.get("prompt", "") or "").strip() or str(global_prompt or "").strip()
+    task = _task_key_from_label(g.get("taskType") or task_type)
+
+    seen = set()
+    assets = []
+    for item in g.get("refs") or []:
+        card = _d_ref_to_asset(item, "image", seen)
+        if card:
+            assets.append(card)
+
+    # v2v 源视频：单源（video.fileName）或多段 videoClips
+    vid = tl.get("video") or {}
+    src_video = str(vid.get("fileName") or vid.get("videoFile") or "").strip()
+    clips = tl.get("videoClips") or []
+
+    segments = []
+    run_sel = out.get("runSelection")
+    run_sel_on = bool(tl.get("runSelectEnabled") or out.get("runSelectEnabled"))
+
+    def _enabled(i, sid):
+        if not run_sel_on or run_sel is None:
+            return True
+        return (i in run_sel) or (sid in run_sel)
+
+    # fl2v：优先 shots[]（startImage/endImage/durationSec）
+    shots = tl.get("shots") or []
+    if shots:
+        for i, sh in enumerate(shots):
+            if not isinstance(sh, dict):
+                continue
+            try:
+                dur = float(sh.get("durationSec") or sh.get("duration") or 5.0)
+            except (TypeError, ValueError):
+                dur = 5.0
+            seg = {"duration": dur, "prompt": str(sh.get("prompt", "") or "").strip(),
+                   "nonce": str(sh.get("id", "") or ""),
+                   "assets": [], "enabled": _enabled(i, sh.get("id")),
+                   "first_frame": _d_frame_ref(sh.get("startImage")),
+                   "last_frame": _d_frame_ref(sh.get("endImage")),
+                   "source": None, "audio_mode": None, "task": "fl2v"}
+            for item in sh.get("refs") or []:
+                card = _d_ref_to_asset(item, "image", seen)
+                if card:
+                    seg["assets"].append(card)
+            segments.append(seg)
+
+    if not segments:
+        for i, s in enumerate(tl.get("segments") or []):
+            if not isinstance(s, dict):
+                continue
+            try:
+                dur = float(s.get("durationSec")
+                            or (int(s.get("frameCount", 0)) / fps)
+                            or 5.0)
+            except (TypeError, ValueError):
+                dur = 5.0
+            st = _task_key_from_label(s.get("taskType") or task)
+            seg = {"duration": round(dur, 3), "prompt": str(s.get("prompt", "") or "").strip(),
+                   "nonce": str(s.get("id", "") or ""),
+                   "assets": [], "enabled": _enabled(i, s.get("id")),
+                   "first_frame": _d_frame_ref(s.get("genImage")),
+                   "last_frame": None, "source": None,
+                   "audio_mode": None, "task": st}
+            for item in s.get("refs") or []:
+                card = _d_ref_to_asset(item, "image", seen)
+                if card:
+                    seg["assets"].append(card)
+            for item in s.get("refAudios") or []:
+                card = _d_ref_to_asset(item, "audio", seen)
+                if card:
+                    seg["assets"].append(card)
+            for item in s.get("refVideos") or []:
+                card = _d_ref_to_asset(item, "video", seen)
+                if card:
+                    seg["assets"].append(card)
+            # v2v/rv2v：段映射到源时间轴 [start, start+length) 帧 -> 秒
+            if st in ("v2v", "rv2v"):
+                vfile = src_video
+                lstart, lend = 0, 0
+                if clips:
+                    clip = clips[min(i, len(clips) - 1)]
+                    vfile = vfile or str(clip.get("videoFile") or clip.get("fileName") or "").strip()
+                    lstart = float(clip.get("logicalStart", 0) or 0)
+                    lend = float(clip.get("logicalEnd", 0) or 0)
+                else:
+                    lstart = float(s.get("start", 0) or 0)
+                    lend = lstart + float(s.get("length", 0) or 0)
+                if lend <= lstart:
+                    lend = lstart + dur * fps
+                if vfile:
+                    seg["source"] = {"video": vfile, "subfolder": "",
+                                     "start": round(lstart / fps, 3),
+                                     "end": round(lend / fps, 3)}
+            segments.append(seg)
+
+    am = str(out.get("audioMode") or out.get("audio_mode") or "").strip().lower()
+    if am == "source":
+        am = "original"
+    options = {
+        "continuity": bool(out.get("continuityEnabled")) if "continuityEnabled" in out else None,
+        "context_length": (min(39, int(out.get("continuityOverlapFrames")))
+                           if out.get("continuityOverlapFrames") else None),
+        "audio_mode": am if am in AUDIO_MODES else None,
+    }
+    return gp, assets, segments, options

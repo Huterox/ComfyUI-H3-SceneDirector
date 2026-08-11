@@ -48,6 +48,43 @@ _LOG = logging.getLogger("h3_scenedirector")
 
 PROGRESS_EVENT = "h3_scenedirector_progress"
 STEP_EVENT = "h3_scenedirector_step"   # 逐步实时预览
+# Director 前端（minimax_timeline.js）的事件名：进度与实时预览按 node_id 定位
+DIR_PROGRESS_EVENT = "minimax_director_progress"
+DIR_PREVIEW_EVENT = "minimax_director_preview"
+
+
+def _dir_progress(node_id, seg, total, phase, phase_label,
+                  phase_value, phase_max, overall_value, overall_max,
+                  partial=False):
+    """按 Director 前端的形状发进度事件。"""
+    if node_id is None:
+        return
+    try:
+        PromptServer.instance.send_sync(DIR_PROGRESS_EVENT, {
+            "node_id": node_id, "segment": seg, "segment_total": total,
+            "timeline_segment": seg, "timeline_segment_total": total,
+            "partial_run": bool(partial),
+            "phase": phase, "phase_label": phase_label,
+            "phase_value": phase_value, "phase_max": phase_max,
+            "overall_value": overall_value, "overall_max": overall_max,
+            "remaining_segments": max(0, total - seg),
+        })
+    except Exception:
+        pass
+
+
+def _dir_preview(node_id, seg_index, image_b64, step, total_steps):
+    """按 Director 前端的形状发实时预览帧（base64 JPEG）。"""
+    if node_id is None:
+        return
+    try:
+        PromptServer.instance.send_sync(DIR_PREVIEW_EVENT, {
+            "node_id": node_id, "segment_index": seg_index,
+            "image_b64": image_b64, "live": True,
+            "step": step, "total_steps": total_steps,
+        })
+    except Exception:
+        pass
 
 
 class _BasicGuider(comfy.samplers.CFGGuider):
@@ -252,9 +289,22 @@ def run_chain(model, vae, audio_vae, segments_raw, story_cond, sampler, sigmas,
               width, height, seed, context_length, audio_context_length,
               encode_mode, anchor_mode, audio_mode, crop, cfg, cache_tag,
               uniform_window=False, color_lock=False, negative=None,
-              continuity=True, seam_blend=True, vram_cleanup=False):
+              continuity=True, seam_blend=True, vram_cleanup=False, node_id=None):
     """链条主循环：缓存命中段直接解码，自第一个变动段起级联重渲；
-    未勾选段（选择运行关闭）走缓存填充。返回 (images, audio, contact_sheet, info)。"""
+    未勾选段（选择运行关闭）走缓存填充。返回 (images, audio, contact_sheet, info)。
+
+    node_id 用于 Director 前端的进度/预览事件定位节点。"""
+    run, run_nonce, global_prompt, globals_rows, assets, segs = P.parse_payload(segments_raw)
+    if not segs:
+        raise ValueError("H3SceneDirector: 请至少加一段带提示词的分镜")
+
+    # run 级覆盖（工作台写进载荷的控制项）：载荷优先，缺省跟随 widget
+    opts = P.parse_run_options(segments_raw)
+    if opts["continuity"] is not None:
+        continuity = opts["continuity"]
+    if opts["context_length"] is not None:
+        context_length = max(1, min(39, opts["context_length"]))
+    run_audio_mode = opts["audio_mode"]
     run, run_nonce, global_prompt, globals_rows, assets, segs = P.parse_payload(segments_raw)
     if not segs:
         raise ValueError("H3SceneDirector: 请至少加一段带提示词的分镜")
@@ -394,6 +444,11 @@ def run_chain(model, vae, audio_vae, segments_raw, story_cond, sampler, sigmas,
             PromptServer.instance.send_sync(PROGRESS_EVENT, {
                 "run": run, "segment": i + 1, "total": len(segs),
                 "cached": n_cached})
+            steps_total = int(sigmas.shape[-1] - 1)
+            _dir_progress(node_id, i + 1, len(segs), "sample", "采样",
+                          0, steps_total, i * steps_total,
+                          len(segs) * steps_total,
+                          partial=n_cached > 0)
             seg_seed = (base_seed + i) & 0xffffffffffffffff
 
             def _live(step, total_steps, img, _i=i):
@@ -404,10 +459,17 @@ def run_chain(model, vae, audio_vae, segments_raw, story_cond, sampler, sigmas,
                     img = img.resize((max(1, round(w * sc)), max(1, round(h * sc))))
                     buf = io.BytesIO()
                     img.save(buf, "JPEG", quality=70)
+                    b64 = base64.b64encode(buf.getvalue()).decode("ascii")
                     PromptServer.instance.send_sync(STEP_EVENT, {
                         "run": run, "segment": _i + 1, "total": len(segs),
                         "step": step + 1, "steps": total_steps,
-                        "image": base64.b64encode(buf.getvalue()).decode("ascii")})
+                        "image": b64})
+                    _dir_preview(node_id, _i, b64, step + 1, total_steps)
+                    _dir_progress(node_id, _i + 1, len(segs), "sample", "采样",
+                                  step + 1, total_steps,
+                                  _i * total_steps + step + 1,
+                                  len(segs) * total_steps,
+                                  partial=n_cached > 0)
                 except Exception:
                     pass
 
@@ -493,6 +555,9 @@ def run_chain(model, vae, audio_vae, segments_raw, story_cond, sampler, sigmas,
     PromptServer.instance.send_sync(PROGRESS_EVENT, {
         "run": run, "segment": len(segs), "total": len(segs),
         "cached": n_cached, "done": True})
+    _dir_progress(node_id, len(segs), len(segs), "done", "完成",
+                  1, 1, len(segs) * max(1, int(sigmas.shape[-1] - 1)),
+                  len(segs) * max(1, int(sigmas.shape[-1] - 1)))
 
     total_frames = sum(int(t.shape[0]) for t in all_images)
     header = ("运行 %r: %d 段 (%d 新渲染 / %d 缓存), base_seed %d, 共 %d 帧 / %.2fs"

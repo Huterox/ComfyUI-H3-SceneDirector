@@ -1,6 +1,9 @@
 """SceneDirector 的 ComfyUI 节点类（薄壳，拒绝上帝节点）。
 
-  H3SceneDirectorList          工作台数据载体（载荷 -> SEGMENTS）
+  H3SceneDirectorList          导演工作台（Director 时间线 UI）数据载体：
+                               前端（js/minimax_timeline.js）把分镜状态写进
+                               timeline_data(v4)，本节点翻译成载荷交给编码头
+                               和链条
   H3SceneDirectorConditioning  文本侧：逐段条件编码，发生在明面上
   H3SceneDirectorChain         纯衔接：钉帧 -> 采样 -> 解码 -> 缓存 -> 拼接
   H3SceneDirectorLatentTemplate 统一渲染窗口的空 AV latent（给会校验
@@ -15,96 +18,80 @@ import json
 from . import payload as P
 from . import executor
 
-
-def _default_payload():
-    """默认的 3 段"无畏机甲 vs 兽人"场景，按承接句协议书写。"""
-    return {
-        "run": "story",
-        "run_nonce": 0,
-        "global_prompt": (
-            "主角设定（全片一致）：一台古代无畏机甲——石棺式重型机身、灰黑色战痕涂装、"
-            "右臂重型爆弹炮、左臂巨大动力拳、腰间链锯剑；敌人为绿色皮肤的兽人潮。"),
-        "globals": [
-            {"category": "视觉风格", "content": "3D CG 电影感，冷峻暗黑基调，硝烟与火光的体积光"},
-            {"category": "世界观", "content": "灰烬与硝烟弥漫的废墟战场，一条笔直的废墟大道，远处残垣与火光"},
-            {"category": "走位与机位", "content": "机甲全程沿大道向画面右前方稳步推进，镜头固定在机甲左侧前方低角度跟拍，机位方向全片不变；兽人从画面右前方（大道深处）出现，向右方深处溃逃"},
-            {"category": "音乐基调", "content": "沉重战鼓与低音铜管，随战况升温"},
-        ],
-        "assets": [],
-        "segments": [
-            {"duration": 5.0, "nonce": "dread1", "assets": [], "enabled": True, "prompt": (
-                "integrated_multimodal_description: [Shot 1] 开场：硝烟弥漫的废墟大道，无畏机甲从画面左方入画，"
-                "沿大道向画面右前方稳步推进，右臂爆弹炮向右前方深处的兽人潮持续点射，炮口火舌喷吐。 "
-                "[Shot 2] At 00:02.500 机甲脚步不停继续向右前方推进，弹壳抛落，"
-                "兽人从瓦砾后嚎叫着涌出迎面扑来。收尾状态：机甲面朝右前方行进中，机位不变。\n"
-                "overall_soundscape: 爆弹轰鸣、兽人嘶吼、沉重脚步声、远处爆炸。\n"
-                "non_diegetic_music: 战鼓渐强，紧张气氛升温。")},
-            {"duration": 5.0, "nonce": "dread2", "assets": [], "enabled": True, "prompt": (
-                "integrated_multimodal_description: [Shot 1] 承接上段：机甲面朝右前方推进中，机位不变。"
-                "兽人扑到近前，机甲左臂动力拳横扫将它们砸飞，脚步不停。 [Shot 2] At 00:02.500 "
-                "机甲边行进边挥拳，又一拳击碎一头跃起的兽人，火花与血雾迸溅，继续向右前方推进。"
-                "收尾状态：机甲仍在行进，兽人攻势减弱。\n"
-                "overall_soundscape: 金属撞击、重拳闷响、兽人哀嚎、液压轰鸣。\n"
-                "non_diegetic_music: 凶猛打击乐，持续激战节奏。")},
-            {"duration": 5.0, "nonce": "dread3", "assets": [], "enabled": True, "prompt": (
-                "integrated_multimodal_description: [Shot 1] 承接上段：机甲向右前方推进，机位不变。"
-                "兽人潮在重火力与重拳下溃散，转身向画面右方深处奔逃，机甲踏着燃烧的残骸继续前进，"
-                "爆弹炮向逃敌点射。 [Shot 2] At 00:02.500 大道前方渐渐清空，硝烟与火光映红天际，"
-                "机甲保持节奏向右前方推进。收尾状态：机甲行进中，大道渐空。\n"
-                "overall_soundscape: 巨大爆炸轰鸣、噼啪火焰、溃逃兽人呼喊、回荡战号。\n"
-                "non_diegetic_music: 凯旋战鼓与铜管号角，强拍收尾。")},
-        ],
-    }
+_TASK_OPTIONS = [
+    "t2v — 文生视频(Text to Video)",
+    "i2v — 图生视频(Image to Video)",
+    "fl2v — 首尾帧生视频(First-Last Frame)",
+    "r2v — 参考主体生视频(Reference to Video)",
+    "v2v — 视频转视频(Video to Video)",
+    "rv2v — 参考素材改视频(Reference Video Edit)",
+]
 
 
 class H3SceneDirectorList:
-    """导演工作台的数据载体。js/workbench 前端把载荷渲染成分镜时间线
-    （场景设定表、资产卡、逐段缩略图/状态/勾选/资产钉）；本节点把
-    run 名钉进去，把载荷交给编码头和链条。"""
+    """导演工作台。widget 面与 Director 对齐（前端时间线 UI 按名查找），
+    run_name 是本包缓存目录命名，两个 BDGROUP 是前端自定义分组头控件。"""
 
     @classmethod
     def INPUT_TYPES(s):
         return {
             "required": {
-                # 工作台载荷：{"run","run_nonce","global_prompt","globals",
-                # "assets","segments"}；也兼容裸的 [{duration,prompt}] 列表
-                "segments": ("STRING", {
-                    "multiline": True,
-                    "default": json.dumps(_default_payload(), ensure_ascii=False),
-                    "tooltip": "导演工作台载荷（由 js/workbench 前端扩展渲染）",
-                }),
-                "run_name": ("STRING", {
-                    "default": "story",
-                    "tooltip": "本次 run 的缓存目录名（output/h3_scenedirector/ 下）。"
-                               "一次 run = 一个场景；换名即开新场景。",
-                }),
-            }
+                "task_type": (_TASK_OPTIONS, {"default": _TASK_OPTIONS[0]}),
+                "global_prompt": ("STRING", {"default": "", "multiline": True}),
+                "bd_grp_sample": ("BDGROUP", {"default": "采样设置"}),
+                "cfg": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 30.0, "step": 0.01}),
+                "seed": ("INT", {"default": 0, "min": 0,
+                                 "max": 0xffffffffffffffff,
+                                 "control_after_generate": True}),
+                "frame_rate": ("FLOAT", {"default": 24.0, "min": 1.0, "max": 240.0,
+                                         "step": 0.01}),
+                "width": ("INT", {"default": 864, "min": 32, "max": 8192, "step": 32}),
+                "height": ("INT", {"default": 480, "min": 32, "max": 8192, "step": 32}),
+                "ref_max_size": ("INT", {"default": 864, "min": 32, "max": 8192,
+                                         "step": 32}),
+                "total_frames": ("INT", {"default": 124, "min": 5, "max": 100000}),
+                "timeline_data": ("STRING", {"default": "", "multiline": True}),
+                "bd_grp_perf": ("BDGROUP", {"default": "性能"}),
+                "clear_vram_between_segments": ("BOOLEAN", {"default": True}),
+                "export_source_images": ("BOOLEAN", {"default": False}),
+                # 本包自有：缓存目录名（output/h3_scenedirector/ 下）
+                "run_name": ("STRING", {"default": "story"}),
+            },
         }
 
     RETURN_TYPES = ("SEGMENTS",)
     RETURN_NAMES = ("segments",)
     FUNCTION = "make_list"
     CATEGORY = "conditioning/minimax"
-    DESCRIPTION = ("导演工作台：场景设定表 + 资产卡 + 分镜时间线，"
-                   "输出 run 载荷给编码头和链条。")
+    DESCRIPTION = ("导演工作台：分镜时间线（Director UI）→ 载荷，"
+                   "输出给编码头和链条。")
 
-    def make_list(self, segments, run_name="story"):
-        run, run_nonce, global_prompt, globals_rows, assets, segs = P.parse_payload(segments)
-        run = P.sanitize_run(run_name) if str(run_name or "").strip() else run
+    def make_list(self, task_type, global_prompt, bd_grp_sample, cfg, seed,
+                  frame_rate, width, height, ref_max_size, total_frames,
+                  timeline_data, bd_grp_perf, clear_vram_between_segments,
+                  export_source_images, run_name):
+        gp, assets, segs, options = P.parse_director(
+            timeline_data, task_type, global_prompt, P.sanitize_run(run_name))
         if not segs:
-            raise ValueError("H3SceneDirectorList: 至少加一段带提示词的分镜")
-        payload = {"run": run, "run_nonce": run_nonce, "global_prompt": global_prompt,
-                   "globals": globals_rows, "assets": assets, "segments": segs}
+            # UI 还没写时间线时给一段空白 t2v，避免空载荷报错
+            segs = [{"duration": max(1.0, round(total_frames / max(1.0, frame_rate), 2)),
+                     "prompt": "", "nonce": "", "assets": [], "enabled": True,
+                     "first_frame": None, "last_frame": None, "source": None,
+                     "audio_mode": "generate", "task": P._task_key_from_label(task_type)}]
+        payload = {"run": P.sanitize_run(run_name), "run_nonce": 0,
+                   "global_prompt": gp, "globals": [], "assets": assets,
+                   "segments": segs}
+        if options.get("continuity") is not None:
+            payload["continuity"] = options["continuity"]
+        if options.get("context_length") is not None:
+            payload["context_length"] = options["context_length"]
+        if options.get("audio_mode") is not None:
+            payload["audio_mode"] = options["audio_mode"]
         return (json.dumps(payload, ensure_ascii=False),)
 
 
 class H3SceneDirectorConditioning:
-    """逐段文本/参考素材条件，在衔接引擎之外构建，文本编码器侧保持可hack。
-
-    每段拼出完整提示词（场景设定表 + 资产清单 + 段提示词 + 段级资产
-    钉），用接进来的 CLIP 编码；资产参考（图/视频/音频）与 v2v 源片段
-    用接进来的 VAE 按官方 r2v 配比编码；段级首尾帧钉为关键帧（fl2v）。
-    """
+    """逐段文本/参考素材条件，在衔接引擎之外构建，文本编码器侧保持可hack。"""
 
     @classmethod
     def INPUT_TYPES(s):
@@ -112,16 +99,12 @@ class H3SceneDirectorConditioning:
             "required": {
                 "clip": ("CLIP",),
                 "vae": ("VAE",),
-                # 接喂链条的同一个 StoryList
                 "segments": ("SEGMENTS",),
-                # 与链条的画布一致：参考图按它配比，链条会交叉校验
                 "width": ("INT", {"default": 1344, "min": 32, "max": 8192, "step": 32}),
                 "height": ("INT", {"default": 768, "min": 32, "max": 8192, "step": 32}),
             },
             "optional": {
-                # 音频参考块/v2v 原声需要它（图/视频参考不接也能跑）
                 "audio_vae": ("VAE",),
-                # 钉为段 1 的第 0 帧关键帧（i2v 开场）
                 "first_frame": ("IMAGE",),
             },
         }
@@ -146,7 +129,6 @@ class H3SceneDirectorChain:
       * BasicScheduler  -> sigmas   (SIGMAS)
       * MODEL 补丁（Spectrum 等）接在 model 之前
       * 可选 negative (CONDITIONING) + cfg widget 做引导采样
-        （不接 negative 时保持官方 H3 的仅正条件行为）
 
     缓存：每段落盘 output/h3_scenedirector/<run>/，只从第一个变动段
     起级联重渲；选择运行关闭的段用缓存填充。"""
@@ -158,15 +140,10 @@ class H3SceneDirectorChain:
                 "model": ("MODEL",),
                 "vae": ("VAE",),
                 "audio_vae": ("VAE",),
-                # 接 StoryList……
                 "segments": ("SEGMENTS",),
-                # ……和同源的编码头
                 "story_cond": ("STORY_COND",),
-                # 标准采样节点接这里
                 "sampler": ("SAMPLER",),
                 "sigmas": ("SIGMAS",),
-                # 宽高是 widget（对齐 MiniMaxH3ImageToVideo 的序列化），
-                # 从 ResolutionSelector 接线
                 "width": ("INT", {"default": 1344, "min": 32, "max": 8192, "step": 32}),
                 "height": ("INT", {"default": 768, "min": 32, "max": 8192, "step": 32}),
                 "seed": ("INT", {"default": -1, "min": -1, "max": 0xffffffffffffffff}),
@@ -176,41 +153,18 @@ class H3SceneDirectorChain:
                 "anchor_mode": (["head", "before"], {"default": "head"}),
                 "audio_mode": (["timeline", "ref"], {"default": "timeline"}),
                 "crop": (["disabled", "center"], {"default": "disabled"}),
-                "cfg": ("FLOAT", {
-                    "default": 1.0, "min": 0.0, "max": 30.0, "step": 0.1,
-                    "tooltip": "CFG 强度，仅当接了 negative 条件时生效。"
-                               "不接 negative 就是仅正条件（官方 H3 行为）。"}),
-                "cache_tag": ("STRING", {
-                    "default": "",
-                    "tooltip": "手动缓存作废标签。磁盘缓存无法指纹化你接进来的 "
-                               "UNET/LoRA，换模型或加速器后改一下这个标签"
-                               "（比如 'turbo4'）即可强制全链重渲。"}),
-                "continuity": ("BOOLEAN", {
-                    "default": True,
-                    "tooltip": "段间引导（特征上下文窗口衔接）：开 = 把上一段尾部的 "
-                               "latent 上下文钉入下一段；关 = 官方原生逐段独立渲染。"}),
-                "seam_blend": ("BOOLEAN", {
-                    "default": True,
-                    "tooltip": "接缝互补：本段开头几帧亮度向上一段尾巴渐变，"
-                               "消除接口跳变（仅在衔接开启时生效）。"}),
-                "uniform_window": ("BOOLEAN", {
-                    "default": False,
-                    "tooltip": "每段（含段 1）都按统一窗口渲染（时长+钉帧跨度）。"
-                               "校验打包 latent 尺寸的采样器（MultiRate T8）需要它；"
-                               "开启后所有段时长必须相等。"}),
-                "color_lock": ("BOOLEAN", {
-                    "default": False,
-                    "tooltip": "颜色锁定：每段交付前把整段色温/曝光统计对齐到第 1 段，"
-                               "压制逐段独立渲染的白平衡/曝光漂移。锁机位、恒定光照的"
-                               "片子（口播/装配）建议开启；光照需要渐变的片子请关闭。"}),
-                "vram_cleanup": ("BOOLEAN", {
-                    "default": False,
-                    "tooltip": "段间显存清理：每段渲染完卸载模型并清空 CUDA 缓存。"
-                               "显存吃紧时开启，代价是下一段重新装载权重。"}),
+                "cfg": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 30.0, "step": 0.1}),
+                "cache_tag": ("STRING", {"default": ""}),
+                "continuity": ("BOOLEAN", {"default": True}),
+                "seam_blend": ("BOOLEAN", {"default": True}),
+                "uniform_window": ("BOOLEAN", {"default": False}),
+                "color_lock": ("BOOLEAN", {"default": False}),
+                "vram_cleanup": ("BOOLEAN", {"default": False}),
             },
             "optional": {
                 "negative": ("CONDITIONING",),
             },
+            "hidden": {"unique_id": "UNIQUE_ID"},
         }
 
     RETURN_TYPES = ("IMAGE", "AUDIO", "IMAGE", "STRING")
@@ -225,23 +179,18 @@ class H3SceneDirectorChain:
               width, height, seed, context_length, audio_context_length,
               encode_mode, anchor_mode, audio_mode, crop, cfg, cache_tag,
               continuity=True, seam_blend=True, uniform_window=False,
-              color_lock=False, vram_cleanup=False, negative=None):
+              color_lock=False, vram_cleanup=False, negative=None, unique_id=None):
         return executor.run_chain(
             model, vae, audio_vae, segments, story_cond, sampler, sigmas,
             width, height, seed, context_length, audio_context_length,
             encode_mode, anchor_mode, audio_mode, crop, cfg, cache_tag,
             uniform_window=uniform_window, color_lock=color_lock,
             negative=negative, continuity=continuity, seam_blend=seam_blend,
-            vram_cleanup=vram_cleanup)
+            vram_cleanup=vram_cleanup, node_id=unique_id)
 
 
 class H3SceneDirectorLatentTemplate:
-    """与链条逐段渲染窗口一致的空 AV latent。
-
-    会按模板校验打包 latent 尺寸的采样器（MultiRate T8 在尺寸不符时
-    直接报错）需要接一个。链条开 uniform_window、且所有段时长一致时，
-    每次采样调用都与本模板精确匹配（宽高/时长/context_length 要与
-    链条镜像）。"""
+    """与链条逐段渲染窗口一致的空 AV latent（MultiRate T8 类采样器用）。"""
 
     @classmethod
     def INPUT_TYPES(s):
@@ -249,11 +198,8 @@ class H3SceneDirectorLatentTemplate:
             "required": {
                 "width": ("INT", {"default": 1344, "min": 32, "max": 8192, "step": 32}),
                 "height": ("INT", {"default": 768, "min": 32, "max": 8192, "step": 32}),
-                "duration": ("FLOAT", {"default": 5.0, "min": 0.2, "max": 60.0, "step": 0.1,
-                                       "tooltip": "段时长（秒），必须与工作台载荷里每段一致。"}),
-                "context_length": ("INT", {"default": 39, "min": 1, "max": 39,
-                                           "tooltip": "镜像链条的 context_length：渲染窗口"
-                                                      "按钉帧跨度加大。"}),
+                "duration": ("FLOAT", {"default": 5.0, "min": 0.2, "max": 60.0, "step": 0.1}),
+                "context_length": ("INT", {"default": 39, "min": 1, "max": 39}),
             },
         }
 
