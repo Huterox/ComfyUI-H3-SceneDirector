@@ -77,11 +77,17 @@ export function createBackend(api) {
         return () => api.removeEventListener("h3_scenedirector_step", handler);
     }
 
-    // WS：一次执行结束后刷新全部状态
+    // WS：一次执行结束后刷新全部状态。
+    // 0.31 起宿主事件改名 execution_success（execution_end 不再发送），
+    // 两个都订，哪个版本都能收到
     function onExecutionEnd(fn) {
         const handler = (ev) => fn(ev.detail || {});
         api.addEventListener("execution_end", handler);
-        return () => api.removeEventListener("execution_end", handler);
+        api.addEventListener("execution_success", handler);
+        return () => {
+            api.removeEventListener("execution_end", handler);
+            api.removeEventListener("execution_success", handler);
+        };
     }
 
     return {

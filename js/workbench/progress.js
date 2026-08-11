@@ -81,8 +81,10 @@ export function createProgress({ backend, store, resolveRun, onStatus }) {
         timer = setTimeout(refresh, 800);
     }
 
-    // WS：{run, segment, total, cached}
+    // WS：{run, segment, total, cached, done?}——done 由引擎在整轮完成时发出
+    // （宿主 0.31 已无 execution_end，完成定格 100% 走这条路最稳）
     function setProgress(d) {
+        if (d.done) { onDone(); return; }
         rendering = true;
         text.innerHTML = "运行状态：<b>渲染中</b>　第 " + d.segment + "/" + d.total
             + " 段（" + (d.cached || 0) + " 段命中缓存）";

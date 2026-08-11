@@ -146,6 +146,8 @@ def _sample(model, positive, latent, seed, sampler, sigmas, negative=None, cfg=1
     # 另外把"中段时间步"的 latent→RGB 投影经 live 回调推给工作台做逐步预览
     # （线性投影零 VAE 开销；窗口头部是上一段的钉帧上下文，中段才是新内容）
     previewer = latent_preview.get_previewer(model.load_device, model.model.latent_format)
+    if live is not None and previewer is None:
+        _LOG.warning("实时预览不可用：latent 预览器为空（预览方式被禁用？）")
     pbar = comfy.utils.ProgressBar(int(sigmas.shape[-1] - 1))
 
     def callback(step, x0, x, total_steps):
@@ -160,8 +162,13 @@ def _sample(model, positive, latent, seed, sampler, sigmas, negative=None, cfg=1
                 mid = xx[:, :, t // 2: t // 2 + 1] if xx.ndim == 5 else xx
                 live(int(step), int(total_steps),
                      previewer.decode_latent_to_preview(mid))
-            except Exception:
-                pass   # 预览失败绝不拖垮采样
+                if not getattr(callback, "_ok", False):
+                    callback._ok = True
+                    _LOG.info("实时预览首帧已发送（latent shape %s）", tuple(xx.shape))
+            except Exception as e:
+                if not getattr(callback, "_warned", False):
+                    callback._warned = True
+                    _LOG.warning("实时预览帧生成失败（仅报一次）: %r", e)
 
     samples = guider.sample(noise, latent_image, sampler, sigmas,
                             denoise_mask=None, callback=callback,
@@ -385,6 +392,12 @@ def run_chain(model, vae, audio_vae, segments_raw, story_cond, sampler, sigmas,
     # 下次开关翻转时据此重存工件（不动 latent，不重渲）
     meta_out["color_lock"] = bool(color_lock)
     C.save_meta(rd, meta_out)
+
+    # 完成事件：这版 ComfyUI 已没有 execution_end（改名 execution_success），
+    # 前端定格 100% 不能依赖宿主事件名，由引擎自己发
+    PromptServer.instance.send_sync(PROGRESS_EVENT, {
+        "run": run, "segment": len(segs), "total": len(segs),
+        "cached": first_dirty, "done": True})
 
     total_frames = sum(int(t.shape[0]) for t in all_images)
     header = ("运行 %r: %d 段 (%d 新渲染 / %d 缓存), base_seed %d, 共 %d 帧 / %.2fs"
