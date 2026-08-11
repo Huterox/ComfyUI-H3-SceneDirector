@@ -1,0 +1,1579 @@
+{
+ "id": "75a5608f-f24a-4082-80aa-d3af3552c17f",
+ "revision": 0,
+ "last_node_id": 24,
+ "last_link_id": 134,
+ "nodes": [
+  {
+   "id": 5,
+   "type": "VAELoader",
+   "pos": [
+    -750,
+    1420
+   ],
+   "size": [
+    300,
+    58
+   ],
+   "flags": {
+    "core": true
+   },
+   "order": 0,
+   "mode": 0,
+   "inputs": [
+    {
+     "localized_name": "vae名称",
+     "name": "vae_name",
+     "type": "COMBO",
+     "widget": {
+      "name": "vae_name"
+     }
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "VAE",
+     "name": "VAE",
+     "type": "VAE",
+     "slot_index": 0,
+     "links": [
+      106
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "VAELoader"
+   },
+   "widgets_values": [
+    "minimax_h3_audio_vae_fp32.safetensors"
+   ],
+   "color": "#2a4b6e"
+  },
+  {
+   "id": 10,
+   "type": "H3SceneDirectorChain",
+   "pos": [
+    40,
+    40
+   ],
+   "size": [
+    420,
+    510
+   ],
+   "flags": {
+    "core": true
+   },
+   "order": 15,
+   "mode": 0,
+   "inputs": [
+    {
+     "localized_name": "model",
+     "name": "model",
+     "type": "MODEL",
+     "link": 102
+    },
+    {
+     "localized_name": "vae",
+     "name": "vae",
+     "type": "VAE",
+     "link": 105
+    },
+    {
+     "localized_name": "audio_vae",
+     "name": "audio_vae",
+     "type": "VAE",
+     "link": 106
+    },
+    {
+     "localized_name": "segments",
+     "name": "segments",
+     "type": "SEGMENTS",
+     "link": 134
+    },
+    {
+     "localized_name": "story_cond",
+     "name": "story_cond",
+     "type": "STORY_COND",
+     "link": 118
+    },
+    {
+     "localized_name": "sampler",
+     "name": "sampler",
+     "type": "SAMPLER",
+     "link": 109
+    },
+    {
+     "localized_name": "sigmas",
+     "name": "sigmas",
+     "type": "SIGMAS",
+     "link": 110
+    },
+    {
+     "localized_name": "negative",
+     "name": "negative",
+     "shape": 7,
+     "type": "CONDITIONING",
+     "link": null
+    },
+    {
+     "localized_name": "width",
+     "name": "width",
+     "type": "INT",
+     "widget": {
+      "name": "width"
+     },
+     "link": 107
+    },
+    {
+     "localized_name": "height",
+     "name": "height",
+     "type": "INT",
+     "widget": {
+      "name": "height"
+     },
+     "link": 108
+    },
+    {
+     "localized_name": "seed",
+     "name": "seed",
+     "type": "INT",
+     "widget": {
+      "name": "seed"
+     }
+    },
+    {
+     "localized_name": "context_length",
+     "name": "context_length",
+     "type": "INT",
+     "widget": {
+      "name": "context_length"
+     }
+    },
+    {
+     "localized_name": "audio_context_length",
+     "name": "audio_context_length",
+     "type": "INT",
+     "widget": {
+      "name": "audio_context_length"
+     }
+    },
+    {
+     "localized_name": "encode_mode",
+     "name": "encode_mode",
+     "type": "COMBO",
+     "widget": {
+      "name": "encode_mode"
+     }
+    },
+    {
+     "localized_name": "anchor_mode",
+     "name": "anchor_mode",
+     "type": "COMBO",
+     "widget": {
+      "name": "anchor_mode"
+     }
+    },
+    {
+     "localized_name": "audio_mode",
+     "name": "audio_mode",
+     "type": "COMBO",
+     "widget": {
+      "name": "audio_mode"
+     }
+    },
+    {
+     "localized_name": "crop",
+     "name": "crop",
+     "type": "COMBO",
+     "widget": {
+      "name": "crop"
+     }
+    },
+    {
+     "localized_name": "cfg",
+     "name": "cfg",
+     "type": "FLOAT",
+     "widget": {
+      "name": "cfg"
+     }
+    },
+    {
+     "localized_name": "cache_tag",
+     "name": "cache_tag",
+     "type": "STRING",
+     "widget": {
+      "name": "cache_tag"
+     }
+    },
+    {
+     "localized_name": "uniform_window",
+     "name": "uniform_window",
+     "type": "BOOLEAN",
+     "widget": {
+      "name": "uniform_window"
+     }
+    },
+    {
+     "localized_name": "color_lock",
+     "name": "color_lock",
+     "type": "BOOLEAN",
+     "widget": {
+      "name": "color_lock"
+     },
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "images",
+     "name": "images",
+     "type": "IMAGE",
+     "slot_index": 0,
+     "links": [
+      112
+     ]
+    },
+    {
+     "localized_name": "audio",
+     "name": "audio",
+     "type": "AUDIO",
+     "slot_index": 1,
+     "links": [
+      113
+     ]
+    },
+    {
+     "localized_name": "contact_sheet",
+     "name": "contact_sheet",
+     "type": "IMAGE",
+     "slot_index": 2,
+     "links": [
+      115
+     ]
+    },
+    {
+     "localized_name": "info",
+     "name": "info",
+     "type": "STRING",
+     "slot_index": 3,
+     "links": [
+      116
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "H3SceneDirectorChain"
+   },
+   "widgets_values": [
+    768,
+    1376,
+    -1,
+    "fixed",
+    39,
+    39,
+    "video",
+    "head",
+    "timeline",
+    "disabled",
+    1,
+    "",
+    false,
+    true
+   ],
+   "color": "#2a5f2a"
+  },
+  {
+   "id": 11,
+   "type": "CreateVideo",
+   "pos": [
+    620,
+    40
+   ],
+   "size": [
+    300,
+    102
+   ],
+   "flags": {
+    "core": true
+   },
+   "order": 16,
+   "mode": 0,
+   "inputs": [
+    {
+     "localized_name": "图像",
+     "name": "images",
+     "type": "IMAGE",
+     "link": 112
+    },
+    {
+     "localized_name": "音频",
+     "name": "audio",
+     "shape": 7,
+     "type": "AUDIO",
+     "link": 113
+    },
+    {
+     "localized_name": "帧率",
+     "name": "fps",
+     "type": "FLOAT",
+     "widget": {
+      "name": "fps"
+     }
+    },
+    {
+     "localized_name": "bit_depth",
+     "name": "bit_depth",
+     "shape": 7,
+     "type": "INT",
+     "widget": {
+      "name": "bit_depth"
+     }
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "视频",
+     "name": "VIDEO",
+     "type": "VIDEO",
+     "slot_index": 0,
+     "links": [
+      114
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "CreateVideo"
+   },
+   "widgets_values": [
+    24,
+    8
+   ]
+  },
+  {
+   "id": 20,
+   "type": "MarkdownNote",
+   "pos": [
+    1020,
+    40
+   ],
+   "size": [
+    450,
+    740
+   ],
+   "flags": {},
+   "order": 1,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [],
+   "title": "Note: MiniMax H3",
+   "properties": {},
+   "widgets_values": [
+    "## MiniMax H3\n\n[MiniMax H3](https://www.minimax.io/blog/minimax-h3) is MiniMax's general-purpose, omni-modal generation model. It jointly understands text, image, video, and audio, and generates video with **native stereo audio**: voice, sound effects, and music are modeled jointly in a single forward pass, not layered on afterward. Output is up to 2K resolution, 24fps, and up to about 15 seconds.\n\n## ComfyUI links\n- [ComfyUI#15224](https://github.com/Comfy-Org/ComfyUI/pull/15224)\n- [🤗 Comfy-Org/MiniMax-H3](https://huggingface.co/Comfy-Org/MiniMax-H3)\n\n## About this workflow\n\n**Key inputs**\n\n- **prompt**: describe the shots, camera moves, and the accompanying audio (dialogue, SFX, music) in one block\n- **width / height**: set via Resolution Selector. H3's native canvas is a 768px short edge, capped at 768x1344 pixels, rounded to a multiple of 32\n- **duration (seconds)**: converted to a valid frame `length` by the Math Expression node, snapping up to the model's 17-frame-per-block (17k+5) grid at 24fps\n"
+   ],
+   "color": "#222",
+   "bgcolor": "#000"
+  },
+  {
+   "id": 21,
+   "type": "MarkdownNote",
+   "pos": [
+    1500,
+    40
+   ],
+   "size": [
+    440,
+    740
+   ],
+   "flags": {},
+   "order": 2,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [],
+   "title": "Note: Model Links",
+   "properties": {},
+   "widgets_values": [
+    "## Model Links\n\n**vae**\n\n- [minimax_h3_video_vae_fp16.safetensors](https://huggingface.co/Comfy-Org/MiniMax-H3/resolve/main/vae/minimax_h3_video_vae_fp16.safetensors)\n- [minimax_h3_audio_vae_fp32.safetensors](https://huggingface.co/Comfy-Org/MiniMax-H3/resolve/main/vae/minimax_h3_audio_vae_fp32.safetensors)\n\n**diffusion_models**\n\n- [minimax_h3_fl2va_pruned_int8_convrot.safetensors](https://huggingface.co/Comfy-Org/MiniMax-H3/resolve/main/diffusion_models/minimax_h3_fl2va_pruned_int8_convrot.safetensors)\n\n**text_encoders**\n\n- [qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors](https://huggingface.co/Comfy-Org/MiniMax-H3/resolve/main/text_encoders/qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors)\n\n\n## Model Storage Location\n\n```\n📂 ComfyUI/\n├── 📂 models/\n│   ├── 📂 vae/\n│   │   ├── minimax_h3_video_vae_fp16.safetensors\n│   │   └── minimax_h3_audio_vae_fp32.safetensors\n│   ├── 📂 diffusion_models/\n│   │   └── minimax_h3_fl2va_pruned_int8_convrot.safetensors\n│   └── 📂 text_encoders/\n│       └── qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors\n```\n\n## Report Issue\n\nNote: Please update ComfyUI first ([guide](https://docs.comfy.org/installation/update_comfyui)) and prepare required models. Desktop/Cloud updates follow stable releases, so some nightly-supported models may not be available yet.\n\n- Cannot run / runtime errors: [ComfyUI/issues](https://github.com/comfyanonymous/ComfyUI/issues)\n- UI / frontend issues: [ComfyUI_frontend/issues](https://github.com/Comfy-Org/ComfyUI_frontend/issues)\n- Workflow issues: [workflow_templates/issues](https://github.com/Comfy-Org/workflow_templates/issues)\n"
+   ],
+   "color": "#222",
+   "bgcolor": "#000"
+  },
+  {
+   "id": 23,
+   "type": "Reroute",
+   "pos": [
+    -250,
+    -40
+   ],
+   "size": [
+    75,
+    26
+   ],
+   "flags": {},
+   "order": 10,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "",
+     "type": "SEGMENTS",
+     "link": 111
+    }
+   ],
+   "outputs": [
+    {
+     "name": "",
+     "type": "SEGMENTS",
+     "slot_index": 0,
+     "links": [
+      133
+     ]
+    }
+   ],
+   "properties": {
+    "showOutputText": false,
+    "horizontal": false
+   }
+  },
+  {
+   "id": 24,
+   "type": "Reroute",
+   "pos": [
+    30,
+    -40
+   ],
+   "size": [
+    75,
+    26
+   ],
+   "flags": {},
+   "order": 13,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "",
+     "type": "SEGMENTS",
+     "link": 133
+    }
+   ],
+   "outputs": [
+    {
+     "name": "",
+     "type": "SEGMENTS",
+     "slot_index": 0,
+     "links": [
+      134
+     ]
+    }
+   ],
+   "properties": {
+    "showOutputText": false,
+    "horizontal": false
+   }
+  },
+  {
+   "id": 22,
+   "type": "H3SceneDirectorConditioning",
+   "pos": [
+    -314.15635106123426,
+    56.30123289791044
+   ],
+   "size": [
+    300,
+    200
+   ],
+   "flags": {},
+   "order": 11,
+   "mode": 0,
+   "inputs": [
+    {
+     "localized_name": "clip",
+     "name": "clip",
+     "type": "CLIP",
+     "link": 104
+    },
+    {
+     "localized_name": "vae",
+     "name": "vae",
+     "type": "VAE",
+     "link": 119
+    },
+    {
+     "localized_name": "segments",
+     "name": "segments",
+     "type": "SEGMENTS",
+     "link": 120
+    },
+    {
+     "localized_name": "first_frame",
+     "name": "first_frame",
+     "shape": 7,
+     "type": "IMAGE",
+     "link": null
+    },
+    {
+     "localized_name": "width",
+     "name": "width",
+     "type": "INT",
+     "widget": {
+      "name": "width"
+     },
+     "link": 121
+    },
+    {
+     "localized_name": "height",
+     "name": "height",
+     "type": "INT",
+     "widget": {
+      "name": "height"
+     },
+     "link": 122
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "story_cond",
+     "name": "story_cond",
+     "type": "STORY_COND",
+     "slot_index": 0,
+     "links": [
+      118
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "H3SceneDirectorConditioning"
+   },
+   "widgets_values": [
+    768,
+    1376
+   ],
+   "color": "#3a3a6e"
+  },
+  {
+   "id": 8,
+   "type": "BasicScheduler",
+   "pos": [
+    -342.54560733967435,
+    1390.64298627133
+   ],
+   "size": [
+    300,
+    106
+   ],
+   "flags": {
+    "core": true
+   },
+   "order": 14,
+   "mode": 0,
+   "inputs": [
+    {
+     "localized_name": "模型",
+     "name": "model",
+     "type": "MODEL",
+     "link": 103
+    },
+    {
+     "localized_name": "调度器",
+     "name": "scheduler",
+     "type": "COMBO",
+     "widget": {
+      "name": "scheduler"
+     }
+    },
+    {
+     "localized_name": "步数",
+     "name": "steps",
+     "type": "INT",
+     "widget": {
+      "name": "steps"
+     }
+    },
+    {
+     "localized_name": "降噪",
+     "name": "denoise",
+     "type": "FLOAT",
+     "widget": {
+      "name": "denoise"
+     }
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "Sigmas",
+     "name": "SIGMAS",
+     "type": "SIGMAS",
+     "slot_index": 0,
+     "links": [
+      110
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "BasicScheduler"
+   },
+   "widgets_values": [
+    "simple",
+    20,
+    1
+   ],
+   "color": "#2a4b6e"
+  },
+  {
+   "id": 3,
+   "type": "CLIPLoader",
+   "pos": [
+    -340.47789859526944,
+    1719.3081174634553
+   ],
+   "size": [
+    300,
+    106
+   ],
+   "flags": {
+    "core": true
+   },
+   "order": 3,
+   "mode": 0,
+   "inputs": [
+    {
+     "localized_name": "CLIP名称",
+     "name": "clip_name",
+     "type": "COMBO",
+     "widget": {
+      "name": "clip_name"
+     }
+    },
+    {
+     "localized_name": "类型",
+     "name": "type",
+     "type": "COMBO",
+     "widget": {
+      "name": "type"
+     }
+    },
+    {
+     "localized_name": "设备",
+     "name": "device",
+     "shape": 7,
+     "type": "COMBO",
+     "widget": {
+      "name": "device"
+     }
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "CLIP",
+     "name": "CLIP",
+     "type": "CLIP",
+     "slot_index": 0,
+     "links": [
+      104
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "CLIPLoader"
+   },
+   "widgets_values": [
+    "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+    "minimax",
+    "default"
+   ],
+   "color": "#2a4b6e"
+  },
+  {
+   "id": 19,
+   "type": "MarkdownNote",
+   "pos": [
+    91.69990139982666,
+    1298.5562227069968
+   ],
+   "size": [
+    300,
+    520
+   ],
+   "flags": {},
+   "order": 4,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [],
+   "title": "Note: Size Settings Reference",
+   "properties": {},
+   "widgets_values": [
+    "| megapixels | Aspect | Output (multiple=32) |\n|---|---|---|\n| 0.2 | 16:9 | 608 x 352 |\n| 0.3 | 16:9 | 736 x 416 |\n| 0.4 | 16:9 | 864 x 480 |\n| 0.5 | 16:9 | 960 x 544 |\n| 0.6 | 16:9 | 1056 x 608 |\n| 0.7 | 16:9 | 1152 x 640 |\n| 0.8 | 16:9 | 1216 x 672 |\n| 0.9 | 16:9 | 1280 x 736 |\n| 0.98 | 16:9 | 1344 x 768 |\n| 1.0 | 16:9 | 1376 x 768 |\n| 1.2 | 16:9 | 1504 x 832 |\n| 1.5 | 16:9 | 1664 x 928 |\n| 1.8 | 16:9 | 1824 x 1024 |\n| 2.0 | 16:9 | 1920 x 1088 |\n"
+   ],
+   "color": "#222",
+   "bgcolor": "#000"
+  },
+  {
+   "id": 2,
+   "type": "SpectrumApplyMiniMaxH3",
+   "pos": [
+    -1127.7711025794574,
+    1285.813277012519
+   ],
+   "size": [
+    330,
+    322
+   ],
+   "flags": {
+    "core": true
+   },
+   "order": 12,
+   "mode": 0,
+   "inputs": [
+    {
+     "localized_name": "model",
+     "name": "model",
+     "type": "MODEL",
+     "link": 101
+    },
+    {
+     "localized_name": "enabled",
+     "name": "enabled",
+     "type": "BOOLEAN",
+     "widget": {
+      "name": "enabled"
+     }
+    },
+    {
+     "localized_name": "blend_weight",
+     "name": "blend_weight",
+     "type": "FLOAT",
+     "widget": {
+      "name": "blend_weight"
+     }
+    },
+    {
+     "localized_name": "degree",
+     "name": "degree",
+     "type": "INT",
+     "widget": {
+      "name": "degree"
+     }
+    },
+    {
+     "localized_name": "ridge_lambda",
+     "name": "ridge_lambda",
+     "type": "FLOAT",
+     "widget": {
+      "name": "ridge_lambda"
+     }
+    },
+    {
+     "localized_name": "window_size",
+     "name": "window_size",
+     "type": "FLOAT",
+     "widget": {
+      "name": "window_size"
+     }
+    },
+    {
+     "localized_name": "flex_window",
+     "name": "flex_window",
+     "type": "FLOAT",
+     "widget": {
+      "name": "flex_window"
+     }
+    },
+    {
+     "localized_name": "warmup_steps",
+     "name": "warmup_steps",
+     "type": "INT",
+     "widget": {
+      "name": "warmup_steps"
+     }
+    },
+    {
+     "localized_name": "tail_actual_steps",
+     "name": "tail_actual_steps",
+     "type": "INT",
+     "widget": {
+      "name": "tail_actual_steps"
+     }
+    },
+    {
+     "localized_name": "max_history",
+     "name": "max_history",
+     "type": "INT",
+     "widget": {
+      "name": "max_history"
+     }
+    },
+    {
+     "localized_name": "debug",
+     "name": "debug",
+     "type": "BOOLEAN",
+     "widget": {
+      "name": "debug"
+     }
+    },
+    {
+     "localized_name": "history_storage",
+     "name": "history_storage",
+     "shape": 7,
+     "type": "COMBO",
+     "widget": {
+      "name": "history_storage"
+     }
+    },
+    {
+     "localized_name": "bootstrap_first_forecast",
+     "name": "bootstrap_first_forecast",
+     "shape": 7,
+     "type": "BOOLEAN",
+     "widget": {
+      "name": "bootstrap_first_forecast"
+     }
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "model",
+     "name": "model",
+     "type": "MODEL",
+     "slot_index": 0,
+     "links": [
+      102,
+      103
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "SpectrumApplyMiniMaxH3"
+   },
+   "widgets_values": [
+    true,
+    0.5,
+    1,
+    0.1,
+    2,
+    0.75,
+    1,
+    1,
+    8,
+    false,
+    "system_ram",
+    true
+   ],
+   "color": "#6e4b2a"
+  },
+  {
+   "id": 4,
+   "type": "VAELoader",
+   "pos": [
+    -749.9999999999999,
+    1309.0060256219442
+   ],
+   "size": [
+    300,
+    58
+   ],
+   "flags": {
+    "core": true
+   },
+   "order": 5,
+   "mode": 0,
+   "inputs": [
+    {
+     "localized_name": "vae名称",
+     "name": "vae_name",
+     "type": "COMBO",
+     "widget": {
+      "name": "vae_name"
+     }
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "VAE",
+     "name": "VAE",
+     "type": "VAE",
+     "slot_index": 0,
+     "links": [
+      105,
+      119
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "VAELoader"
+   },
+   "widgets_values": [
+    "minimax_h3_video_vae_fp16.safetensors"
+   ],
+   "color": "#2a4b6e"
+  },
+  {
+   "id": 15,
+   "type": "PreviewAudio",
+   "pos": [
+    590.1618822422267,
+    854.6082615193257
+   ],
+   "size": [
+    340,
+    140
+   ],
+   "flags": {
+    "core": true
+   },
+   "order": 20,
+   "mode": 0,
+   "inputs": [
+    {
+     "localized_name": "音频",
+     "name": "audio",
+     "type": "AUDIO",
+     "link": 117
+    },
+    {
+     "localized_name": "音频UI",
+     "name": "audioUI",
+     "type": "AUDIO_UI",
+     "widget": {
+      "name": "audioUI"
+     },
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "audio",
+     "name": "audio",
+     "type": "AUDIO",
+     "slot_index": 0,
+     "links": null
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "PreviewAudio"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 12,
+   "type": "SaveVideo",
+   "pos": [
+    614.4745575392413,
+    168.94886213762254
+   ],
+   "size": [
+    300,
+    106
+   ],
+   "flags": {
+    "core": true
+   },
+   "order": 19,
+   "mode": 0,
+   "inputs": [
+    {
+     "localized_name": "视频",
+     "name": "video",
+     "type": "VIDEO",
+     "link": 114
+    },
+    {
+     "localized_name": "文件名前缀",
+     "name": "filename_prefix",
+     "type": "STRING",
+     "widget": {
+      "name": "filename_prefix"
+     }
+    },
+    {
+     "localized_name": "格式",
+     "name": "format",
+     "type": "COMBO",
+     "widget": {
+      "name": "format"
+     }
+    },
+    {
+     "localized_name": "编码器",
+     "name": "codec",
+     "type": "COMFY_DYNAMICCOMBO_V3",
+     "widget": {
+      "name": "codec"
+     }
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "video",
+     "name": "video",
+     "type": "VIDEO",
+     "slot_index": 0,
+     "links": null
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "SaveVideo"
+   },
+   "widgets_values": [
+    "video/H3_StoryChain",
+    "auto",
+    "auto"
+   ]
+  },
+  {
+   "id": 14,
+   "type": "PreviewAny",
+   "pos": [
+    586.2066711182694,
+    1035.7715805146968
+   ],
+   "size": [
+    340,
+    200
+   ],
+   "flags": {
+    "core": true
+   },
+   "order": 18,
+   "mode": 0,
+   "inputs": [
+    {
+     "localized_name": "源",
+     "name": "source",
+     "type": "*",
+     "link": 116
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "字符串",
+     "name": "STRING",
+     "type": "STRING",
+     "slot_index": 0,
+     "links": null
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "PreviewAny"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 13,
+   "type": "PreviewImage",
+   "pos": [
+    580.8042212714017,
+    1281.4662810226955
+   ],
+   "size": [
+    344.9994622376041,
+    322.49973111880195
+   ],
+   "flags": {
+    "core": true
+   },
+   "order": 17,
+   "mode": 0,
+   "inputs": [
+    {
+     "localized_name": "图像",
+     "name": "images",
+     "type": "IMAGE",
+     "link": 115
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "images",
+     "name": "images",
+     "type": "IMAGE",
+     "links": null
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "PreviewImage"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 7,
+   "type": "KSamplerSelect",
+   "pos": [
+    -347.62493592361864,
+    1287.9587114485275
+   ],
+   "size": [
+    300,
+    60
+   ],
+   "flags": {
+    "core": true
+   },
+   "order": 6,
+   "mode": 0,
+   "inputs": [
+    {
+     "localized_name": "采样器名称",
+     "name": "sampler_name",
+     "type": "COMBO",
+     "widget": {
+      "name": "sampler_name"
+     }
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "采样器",
+     "name": "SAMPLER",
+     "type": "SAMPLER",
+     "slot_index": 0,
+     "links": [
+      109
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "KSamplerSelect"
+   },
+   "widgets_values": [
+    "res_multistep"
+   ],
+   "color": "#2a4b6e"
+  },
+  {
+   "id": 9,
+   "type": "H3SceneDirectorList",
+   "pos": [
+    -1560.0032628117667,
+    -25.596625927713234
+   ],
+   "size": [
+    1266.5584957191681,
+    952.5267662927156
+   ],
+   "flags": {
+    "core": true
+   },
+   "order": 7,
+   "mode": 0,
+   "inputs": [
+    {
+     "localized_name": "segments",
+     "name": "segments",
+     "type": "STRING",
+     "widget": {
+      "name": "segments"
+     }
+    },
+    {
+     "localized_name": "run_name",
+     "name": "run_name",
+     "type": "STRING",
+     "widget": {
+      "name": "run_name"
+     }
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "segments",
+     "name": "segments",
+     "type": "SEGMENTS",
+     "slot_index": 0,
+     "links": [
+      120,
+      111
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "H3SceneDirectorList"
+   },
+   "widgets_values": [
+    "{\n \"run\": \"studio_anchor\",\n \"run_nonce\": 0,\n \"global_prompt\": \"The news anchor is the young woman from <Picture 1> — short dark-blue hair with a pale streak and a small hair clip, blue eyes, a white-grey pilot-style jacket with orange accents, matching grey knee guards and white boots. Identity lock: her face, hairstyle, eye color and outfit never change across the whole broadcast; she is the only person on screen. Speaker: S1 = her clear, bright young female voice, standard Mandarin, natural conversational pace, warm and relaxed, like talking to a friend.\",\n \"globals\": [\n  {\n   \"category\": \"视觉风格\",\n   \"content\": \"Clean broadcast-studio look, soft even shadowless lighting, natural skin tones, sharp detail\"\n  },\n  {\n   \"category\": \"世界观\",\n   \"content\": \"One fixed studio setup for the whole broadcast: a clean light-grey seamless backdrop, nothing else in frame\"\n  },\n  {\n   \"category\": \"空间锚点与光线\",\n   \"content\": \"She is centered in frame, full body visible from head to toe with a little floor space beneath her boots; the light-grey seamless backdrop fills the background; soft perfectly even light from all around, no cast shadows on the backdrop or floor, no silhouettes; the framing never changes. Lighting baseline held exactly constant across the whole broadcast: identical exposure, identical neutral white balance, identical backdrop brightness and tint in every segment\"\n  },\n  {\n   \"category\": \"走位与机位\",\n   \"content\": \"The camera is locked on a tripod for the entire broadcast: a static full-body shot at eye level; she always faces the camera and never turns her back; no pan, tilt, zoom, focus pull or cut inside any segment\"\n  },\n  {\n   \"category\": \"音乐基调\",\n   \"content\": \"N/A — no background music; clean voice and quiet studio room tone only\"\n  }\n ],\n \"assets\": [\n  {\n   \"category\": \"角色\",\n   \"name\": \"数字主播\",\n   \"image\": \"anchor_ref.jpg\",\n   \"subfolder\": \"\",\n   \"note\": \"蓝短发浅色挑染、小发夹、蓝瞳、白灰橙夹克、灰护膝、白靴\"\n  }\n ],\n \"segments\": [\n  {\n   \"duration\": 5.0,\n   \"nonce\": \"s1_问好名字\",\n   \"assets\": [],\n   \"prompt\": \"integrated_multimodal_description: [Shot 1] Clean broadcast-studio look. A static locked full-body shot, eye-level: she addresses the camera directly, her eyes looking into the lens; she is centered, her whole body visible from head to toe with a little floor space beneath her boots, against the clean light-grey seamless studio backdrop; the camera does not move at all — no pan, no tilt, no zoom, no cut. The lighting, exposure and color temperature stay exactly constant — the backdrop keeps the same neutral light grey and her outfit keeps the same colors throughout; no dimming, no brightening, no flicker, no tint shift. The studio light is soft and perfectly even, casting no shadows: no shadow of her on the backdrop, no shadow on the floor, no dark silhouette anywhere. She always faces the camera directly and never turns her back. The broadcast opens: she faces the camera, composed, feet planted. 0-0.5s: she settles into the shot with a natural blink, shoulders relaxed (audio: quiet studio room tone). 0.5-4.0s: the clear, bright young woman with a natural conversational pace (S1) says: <d>[Chinese] 大家好，我是数字主播小蓝。蓝天的蓝。</d> While speaking she keeps natural micro-motion only — small blinks at the pauses and a small welcoming smile, hands clasped in front of her waist, and a playful tilt of the head as she says her name; her shoulders stay still, her feet stay planted, no body sway, and the framing does not change. 4.0-5s: the line is finished — her mouth closes and she holds the closing expression in a natural quiet beat, no further movement (audio: room tone only). Ending state (handoff to the next segment): hands clasped in front of her waist, a gentle welcoming smile.\\noverall_soundscape: Quiet studio room tone underneath a single clear female voice; no other sounds.\\nnon_diegetic_music: N/A\"\n  },\n  {\n   \"duration\": 5.0,\n   \"nonce\": \"s2_职责\",\n   \"assets\": [],\n   \"prompt\": \"integrated_multimodal_description: [Shot 1] Clean broadcast-studio look. A static locked full-body shot, eye-level: she addresses the camera directly, her eyes looking into the lens; she is centered, her whole body visible from head to toe with a little floor space beneath her boots, against the clean light-grey seamless studio backdrop; the camera does not move at all — no pan, no tilt, no zoom, no cut. The lighting, exposure and color temperature stay exactly constant — the backdrop keeps the same neutral light grey and her outfit keeps the same colors throughout; no dimming, no brightening, no flicker, no tint shift. The studio light is soft and perfectly even, casting no shadows: no shadow of her on the backdrop, no shadow on the floor, no dark silhouette anywhere. She always faces the camera directly and never turns her back. Continuing from the previous segment: she begins from the handoff pose — hands clasped in front of her waist, a gentle welcoming smile. 0-0.5s: she settles into the shot with a natural blink, shoulders relaxed (audio: quiet studio room tone). 0.5-4.7s: the clear, bright young woman with a natural conversational pace (S1) says: <d>[Chinese] 我负责播报工作室的新动态。每天都有更新。</d> While speaking she keeps natural micro-motion only — small blinks at the pauses and her right hand rises briefly to waist level in a small presenting gesture, then returns; her shoulders stay still, her feet stay planted, no body sway, and the framing does not change. 4.7-5s: the line is finished — her mouth closes and she holds the closing expression in a natural quiet beat, no further movement (audio: room tone only). Ending state (handoff to the next segment): hands clasped at her waist again, a bright earnest look.\\noverall_soundscape: Quiet studio room tone underneath a single clear female voice; no other sounds.\\nnon_diegetic_music: N/A\"\n  },\n  {\n   \"duration\": 5.0,\n   \"nonce\": \"s3_自侃\",\n   \"assets\": [],\n   \"prompt\": \"integrated_multimodal_description: [Shot 1] Clean broadcast-studio look. A static locked full-body shot, eye-level: she addresses the camera directly, her eyes looking into the lens; she is centered, her whole body visible from head to toe with a little floor space beneath her boots, against the clean light-grey seamless studio backdrop; the camera does not move at all — no pan, no tilt, no zoom, no cut. The lighting, exposure and color temperature stay exactly constant — the backdrop keeps the same neutral light grey and her outfit keeps the same colors throughout; no dimming, no brightening, no flicker, no tint shift. The studio light is soft and perfectly even, casting no shadows: no shadow of her on the backdrop, no shadow on the floor, no dark silhouette anywhere. She always faces the camera directly and never turns her back. Continuing from the previous segment: she begins from the handoff pose — hands clasped at her waist again, a bright earnest look. 0-0.5s: she settles into the shot with a natural blink, shoulders relaxed (audio: quiet studio room tone). 0.5-4.0s: the clear, bright young woman with a natural conversational pace (S1) says: <d>[Chinese] 别看我是虚拟人。写稿播报我全包了。</d> While speaking she keeps natural micro-motion only — small blinks at the pauses and a small confident nod; her shoulders stay still, her feet stay planted, no body sway, and the framing does not change. 4.0-5s: the line is finished — her mouth closes and she holds the closing expression in a natural quiet beat, no further movement (audio: room tone only). Ending state (handoff to the next segment): hands clasped at her waist, a confident little smile.\\noverall_soundscape: Quiet studio room tone underneath a single clear female voice; no other sounds.\\nnon_diegetic_music: N/A\"\n  },\n  {\n   \"duration\": 5.0,\n   \"nonce\": \"s4_本事\",\n   \"assets\": [],\n   \"prompt\": \"integrated_multimodal_description: [Shot 1] Clean broadcast-studio look. A static locked full-body shot, eye-level: she addresses the camera directly, her eyes looking into the lens; she is centered, her whole body visible from head to toe with a little floor space beneath her boots, against the clean light-grey seamless studio backdrop; the camera does not move at all — no pan, no tilt, no zoom, no cut. The lighting, exposure and color temperature stay exactly constant — the backdrop keeps the same neutral light grey and her outfit keeps the same colors throughout; no dimming, no brightening, no flicker, no tint shift. The studio light is soft and perfectly even, casting no shadows: no shadow of her on the backdrop, no shadow on the floor, no dark silhouette anywhere. She always faces the camera directly and never turns her back. Continuing from the previous segment: she begins from the handoff pose — hands clasped at her waist, a confident little smile. 0-0.5s: she settles into the shot with a natural blink, shoulders relaxed (audio: quiet studio room tone). 0.5-4.5s: the clear, bright young woman with a natural conversational pace (S1) says: <d>[Chinese] 从写稿到配音再到播报。一个人全部搞定。</d> While speaking she keeps natural micro-motion only — small blinks at the pauses and she counts the items lightly on her fingers at waist level; her shoulders stay still, her feet stay planted, no body sway, and the framing does not change. 4.5-5s: the line is finished — her mouth closes and she holds the closing expression in a natural quiet beat, no further movement (audio: room tone only). Ending state (handoff to the next segment): hands clasped at her waist, a proud smile.\\noverall_soundscape: Quiet studio room tone underneath a single clear female voice; no other sounds.\\nnon_diegetic_music: N/A\"\n  },\n  {\n   \"duration\": 5.0,\n   \"nonce\": \"s5_约定\",\n   \"assets\": [],\n   \"prompt\": \"integrated_multimodal_description: [Shot 1] Clean broadcast-studio look. A static locked full-body shot, eye-level: she addresses the camera directly, her eyes looking into the lens; she is centered, her whole body visible from head to toe with a little floor space beneath her boots, against the clean light-grey seamless studio backdrop; the camera does not move at all — no pan, no tilt, no zoom, no cut. The lighting, exposure and color temperature stay exactly constant — the backdrop keeps the same neutral light grey and her outfit keeps the same colors throughout; no dimming, no brightening, no flicker, no tint shift. The studio light is soft and perfectly even, casting no shadows: no shadow of her on the backdrop, no shadow on the floor, no dark silhouette anywhere. She always faces the camera directly and never turns her back. Continuing from the previous segment: she begins from the handoff pose — hands clasped at her waist, a proud smile. 0-0.5s: she settles into the shot with a natural blink, shoulders relaxed (audio: quiet studio room tone). 0.5-4.7s: the clear, bright young woman with a natural conversational pace (S1) says: <d>[Chinese] 以后每天都会在这里跟大家见面。不见不散。</d> While speaking she keeps natural micro-motion only — small blinks at the pauses and a warm smile with a small affirming nod; her shoulders stay still, her feet stay planted, no body sway, and the framing does not change. 4.7-5s: the line is finished — her mouth closes and she holds the closing expression in a natural quiet beat, no further movement (audio: room tone only). Ending state (handoff to the next segment): hands clasped at her waist, a warm smile.\\noverall_soundscape: Quiet studio room tone underneath a single clear female voice; no other sounds.\\nnon_diegetic_music: N/A\"\n  },\n  {\n   \"duration\": 5.0,\n   \"nonce\": \"s6_收尾\",\n   \"assets\": [],\n   \"prompt\": \"integrated_multimodal_description: [Shot 1] Clean broadcast-studio look. A static locked full-body shot, eye-level: she addresses the camera directly, her eyes looking into the lens; she is centered, her whole body visible from head to toe with a little floor space beneath her boots, against the clean light-grey seamless studio backdrop; the camera does not move at all — no pan, no tilt, no zoom, no cut. The lighting, exposure and color temperature stay exactly constant — the backdrop keeps the same neutral light grey and her outfit keeps the same colors throughout; no dimming, no brightening, no flicker, no tint shift. The studio light is soft and perfectly even, casting no shadows: no shadow of her on the backdrop, no shadow on the floor, no dark silhouette anywhere. She always faces the camera directly and never turns her back. Continuing from the previous segment: she begins from the handoff pose — hands clasped at her waist, a warm smile. 0-0.5s: she settles into the shot with a natural blink, shoulders relaxed (audio: quiet studio room tone). 0.5-4.7s: the clear, bright young woman with a natural conversational pace (S1) says: <d>[Chinese] 初次见面，还请大家多多关照。我们下次再见。</d> While speaking she keeps natural micro-motion only — small blinks at the pauses and a gentle closing nod, then a small wave with her right hand; her shoulders stay still, her feet stay planted, no body sway, and the framing does not change. 4.7-5s: the line is finished — her mouth closes and she holds the closing expression in a natural quiet beat, no further movement (audio: room tone only). Ending state (handoff to the next segment): a warm closing smile, right hand lowering from the wave — broadcast over.\\noverall_soundscape: Quiet studio room tone underneath a single clear female voice; no other sounds.\\nnon_diegetic_music: N/A\"\n  }\n ]\n}",
+    "studio_anchor"
+   ],
+   "color": "#1f4e5f"
+  },
+  {
+   "id": 1,
+   "type": "UNETLoader",
+   "pos": [
+    -1451.2349513080642,
+    1280.8735848425686
+   ],
+   "size": [
+    300,
+    82
+   ],
+   "flags": {
+    "core": true
+   },
+   "order": 9,
+   "mode": 0,
+   "inputs": [
+    {
+     "localized_name": "UNet名称",
+     "name": "unet_name",
+     "type": "COMBO",
+     "widget": {
+      "name": "unet_name"
+     }
+    },
+    {
+     "localized_name": "数据类型",
+     "name": "weight_dtype",
+     "type": "COMBO",
+     "widget": {
+      "name": "weight_dtype"
+     }
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "模型",
+     "name": "MODEL",
+     "type": "MODEL",
+     "slot_index": 0,
+     "links": [
+      101
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "UNETLoader"
+   },
+   "widgets_values": [
+    "minimax_h3_fl2va_pruned_fp8_scaled.safetensors",
+    "default"
+   ],
+   "color": "#2a4b6e"
+  },
+  {
+   "id": 6,
+   "type": "ResolutionSelector",
+   "pos": [
+    -344.4746595935875,
+    1544.2886461006162
+   ],
+   "size": [
+    300,
+    126
+   ],
+   "flags": {
+    "core": true
+   },
+   "order": 8,
+   "mode": 0,
+   "inputs": [
+    {
+     "localized_name": "宽高比",
+     "name": "aspect_ratio",
+     "type": "COMBO",
+     "widget": {
+      "name": "aspect_ratio"
+     }
+    },
+    {
+     "localized_name": "百万像素",
+     "name": "megapixels",
+     "type": "FLOAT",
+     "widget": {
+      "name": "megapixels"
+     }
+    },
+    {
+     "localized_name": "倍数",
+     "name": "multiple",
+     "type": "INT",
+     "widget": {
+      "name": "multiple"
+     }
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "宽度",
+     "name": "width",
+     "type": "INT",
+     "slot_index": 0,
+     "links": [
+      107,
+      121
+     ]
+    },
+    {
+     "localized_name": "高度",
+     "name": "height",
+     "type": "INT",
+     "slot_index": 1,
+     "links": [
+      108,
+      122
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "ResolutionSelector"
+   },
+   "widgets_values": [
+    "9:16 (Portrait Widescreen)",
+    1.0,
+    32
+   ],
+   "color": "#2a4b6e"
+  }
+ ],
+ "links": [
+  [
+   101,
+   1,
+   0,
+   2,
+   0,
+   "MODEL"
+  ],
+  [
+   102,
+   2,
+   0,
+   10,
+   0,
+   "MODEL"
+  ],
+  [
+   103,
+   2,
+   0,
+   8,
+   0,
+   "MODEL"
+  ],
+  [
+   104,
+   3,
+   0,
+   22,
+   0,
+   "CLIP"
+  ],
+  [
+   105,
+   4,
+   0,
+   10,
+   1,
+   "VAE"
+  ],
+  [
+   106,
+   5,
+   0,
+   10,
+   2,
+   "VAE"
+  ],
+  [
+   107,
+   6,
+   0,
+   10,
+   8,
+   "INT"
+  ],
+  [
+   108,
+   6,
+   1,
+   10,
+   9,
+   "INT"
+  ],
+  [
+   109,
+   7,
+   0,
+   10,
+   5,
+   "SAMPLER"
+  ],
+  [
+   110,
+   8,
+   0,
+   10,
+   6,
+   "SIGMAS"
+  ],
+  [
+   111,
+   9,
+   0,
+   23,
+   0,
+   "SEGMENTS"
+  ],
+  [
+   112,
+   10,
+   0,
+   11,
+   0,
+   "IMAGE"
+  ],
+  [
+   113,
+   10,
+   1,
+   11,
+   1,
+   "AUDIO"
+  ],
+  [
+   114,
+   11,
+   0,
+   12,
+   0,
+   "VIDEO"
+  ],
+  [
+   115,
+   10,
+   2,
+   13,
+   0,
+   "IMAGE"
+  ],
+  [
+   116,
+   10,
+   3,
+   14,
+   0,
+   "*"
+  ],
+  [
+   117,
+   10,
+   1,
+   15,
+   0,
+   "AUDIO"
+  ],
+  [
+   118,
+   22,
+   0,
+   10,
+   4,
+   "STORY_COND"
+  ],
+  [
+   119,
+   4,
+   0,
+   22,
+   1,
+   "VAE"
+  ],
+  [
+   120,
+   9,
+   0,
+   22,
+   2,
+   "SEGMENTS"
+  ],
+  [
+   121,
+   6,
+   0,
+   22,
+   4,
+   "INT"
+  ],
+  [
+   122,
+   6,
+   1,
+   22,
+   5,
+   "INT"
+  ],
+  [
+   133,
+   23,
+   0,
+   24,
+   0,
+   "SEGMENTS"
+  ],
+  [
+   134,
+   24,
+   0,
+   10,
+   3,
+   "SEGMENTS"
+  ]
+ ],
+ "groups": [
+  {
+   "id": 1,
+   "title": "导演工作台",
+   "bounding": [
+    -1480,
+    -80,
+    1990,
+    1290
+   ],
+   "color": "#2f4f4f88",
+   "flags": {}
+  },
+  {
+   "id": 2,
+   "title": "模型与采样供给",
+   "bounding": [
+    -1480,
+    1210,
+    1100,
+    680
+   ],
+   "color": "#3f505e88",
+   "flags": {}
+  },
+  {
+   "id": 3,
+   "title": "输出",
+   "bounding": [
+    590,
+    0,
+    360,
+    1100
+   ],
+   "color": "#4a4a4a88",
+   "flags": {}
+  },
+  {
+   "id": 4,
+   "title": "说明",
+   "bounding": [
+    990,
+    0,
+    990,
+    800
+   ],
+   "color": "#44444466",
+   "flags": {}
+  }
+ ],
+ "config": {},
+ "extra": {
+  "ds": {
+   "scale": 0.8800946563622198,
+   "offset": [
+    1112.4616359776348,
+    -817.3387743070485
+   ]
+  }
+ },
+ "version": 0.4
+}

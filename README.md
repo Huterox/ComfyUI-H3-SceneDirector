@@ -95,6 +95,7 @@ git clone https://github.com/Huterox/ComfyUI-H3-SceneDirector
 
 - `scenedirector_t2v_workbench.json`：最小工作台（英文示例剧本）
 - `scenedirector_t2v_battle_demo.json`：完整战斗长片示例（中文剧本、完整排线）。它引用了参考图 `dreadnought_ref.jpg`——**请先把这张图复制到 ComfyUI 的 `input/` 目录**（或在工作台资产卡里换成你自己的图）
+- `scenedirector_t2v_anchor_demo.json`：数字人口播示例（自我介绍剧本、锁机位全身景、无影棚、光学恒定 + color_lock 校色，6 段 × 5s）。引用了参考图 `anchor_ref.jpg`——同样先复制到 `input/`
 
 ## 提示词协议（承接句写法）
 
