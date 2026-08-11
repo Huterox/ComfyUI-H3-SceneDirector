@@ -1,5 +1,5 @@
 // SceneDirector 工作台主装配：注册扩展、构建 DOM、状态同步、事件与轮询
-import { app } from "../../scripts/app.js";
+import { app } from "../../../scripts/app.js";
 
 // 样式注入（ComfyUI 只自动加载 js，css 需要手动挂）
 const _css = document.createElement("link");

@@ -1,6 +1,6 @@
 // SceneDirector 工作台：后端 API 封装 + 实时事件订阅
 // 路由见 director/routes.py；事件见 director/executor.py 顶部常量。
-import { api } from "../../scripts/api.js";
+import { api } from "../../../scripts/api.js";
 
 async function post(path, body) {
     const r = await api.fetchApi(path, {
