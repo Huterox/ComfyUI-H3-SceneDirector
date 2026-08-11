@@ -315,6 +315,10 @@ function stripTimelineEphemeralFields(timeline) {
 const HIDDEN_WIDGETS = [
     "timeline_data", "total_frames", "width", "height", "ref_max_size",
     "task_type", "global_prompt", "frame_rate", "cfg",
+    // SceneDirector 适配：增强器配置持久化 widget（前端隐藏）
+    "llm_api_format", "llm_openai_compat_mode", "llm_url", "llm_api_key",
+    "llm_model", "llm_output_language", "llm_character_feature_enhance",
+    "llm_auto_enhance", "llm_unload_after", "llm_custom_template",
 ];
 
 const DIRECTOR_WIDGET_LABEL_KEYS = {

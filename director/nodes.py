@@ -48,6 +48,17 @@ class H3SceneDirectorList:
                 "timeline_data": ("STRING", {"default": "", "multiline": True}),
                 # 本包自有：缓存目录名（output/h3_scenedirector/ 下）
                 "run_name": ("STRING", {"default": "story"}),
+                # 增强器配置持久化（前端隐藏，syncToWidgets 的落点）
+                "llm_api_format": ("STRING", {"default": "OpenAI Compatible"}),
+                "llm_openai_compat_mode": ("STRING", {"default": "标准"}),
+                "llm_url": ("STRING", {"default": "http://127.0.0.1:11434/v1"}),
+                "llm_api_key": ("STRING", {"default": ""}),
+                "llm_model": ("STRING", {"default": "qwen3"}),
+                "llm_output_language": ("STRING", {"default": "中文"}),
+                "llm_character_feature_enhance": ("BOOLEAN", {"default": False}),
+                "llm_auto_enhance": ("BOOLEAN", {"default": False}),
+                "llm_unload_after": ("BOOLEAN", {"default": False}),
+                "llm_custom_template": ("STRING", {"default": "", "multiline": True}),
             },
         }
 
@@ -59,7 +70,7 @@ class H3SceneDirectorList:
                    "输出给编码头和链条。")
 
     def make_list(self, task_type, global_prompt, frame_rate, width, height,
-                  ref_max_size, total_frames, timeline_data, run_name):
+                  ref_max_size, total_frames, timeline_data, run_name, **_llm):
         gp, assets, segs, options = P.parse_director(
             timeline_data, task_type, global_prompt, P.sanitize_run(run_name))
         if not segs:
