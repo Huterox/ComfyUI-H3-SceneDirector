@@ -36,14 +36,10 @@ model / sampler / sigmas 全部走接线，Spectrum 等加速节点即插即用�
 
 ## 示例工作流（example_workflows/）
 
-| 文件 | 模式 | 说明 |
-|---|---|---|
-| `scenedirector_t2v.json` | t2v | 文生音视频 |
-| `scenedirector_fl2v.json` | fl2v | 首尾帧（替换占位首/尾帧图片） |
-| `scenedirector_r2v.json` | r2v | 参考主体（替换占位参考图） |
-| `scenedirector_v2v.json` | v2v | 源视频编辑（替换占位源视频） |
-| `scenedirector_rv2v.json` | rv2v | 源视频 + 参考主体 |
-| `scenedirector_t2v_spec.json` | t2v + Spectrum | 加速版 |
+| 文件 | 说明 |
+|---|---|
+| `scenedirector_workbench.json` | 全能工作台：任务模式在工作台段卡片里按段选择（t2v/i2v/fl2v/r2v/v2v/rv2v）；r2v/v2v/rv2v 时把 UNETLoader 文件换成 ref2va |
+| `scenedirector_workbench_spec.json` | 同款 + Spectrum 加速节点 |
 
 示例提示词与 Director 示例对齐；占位素材（`subject.png`/`source.mp4`/
 `fl2v_first.png`/`fl2v_last.png`）需自行替换到输入目录。
