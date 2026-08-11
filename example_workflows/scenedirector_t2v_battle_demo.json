@@ -284,7 +284,7 @@
   },
   {
    "id": 9,
-   "type": "H3StoryDirectorList",
+   "type": "H3SceneDirectorList",
    "pos": [
     -1450,
     40
@@ -329,7 +329,7 @@
     }
    ],
    "properties": {
-    "Node name for S&R": "H3StoryDirectorList"
+    "Node name for S&R": "H3SceneDirectorList"
    },
    "widgets_values": [
     "{\"run\":\"battle40k_sd\",\"run_nonce\":0,\"global_prompt\":\"主角设定（全片一致）：<Picture 1> 中的古代无畏机甲——石棺式重型机身、灰黑色战痕涂装、右臂重型爆弹炮、左臂巨大动力拳、腰间链锯剑；敌人为绿色皮肤的兽人潮。\",\"globals\":[{\"category\":\"视觉风格\",\"content\":\"3D CG 电影感，冷峻暗黑基调，硝烟与火光的体积光\"},{\"category\":\"世界观\",\"content\":\"灰烬与硝烟弥漫的废墟战场，一条笔直的废墟大道贯穿画面，远处残垣与火光\"},{\"category\":\"走位与机位\",\"content\":\"机甲全程沿大道向画面右前方稳步推进，镜头固定在机甲左侧前方低角度跟拍，机位方向全片不变；兽人从画面右前方（大道深处）出现，向画面右方深处溃逃\"},{\"category\":\"音乐基调\",\"content\":\"沉重战鼓与低音铜管，随战况升温\"}],\"assets\":[{\"category\":\"角色\",\"name\":\"古代无畏机甲\",\"image\":\"dreadnought_ref.jpg\",\"subfolder\":\"\",\"note\":\"石棺机身、灰黑战痕涂装、右臂爆弹炮、左臂动力拳\"}],\"segments\":[{\"duration\":5,\"prompt\":\"integrated_multimodal_description: [Shot 1] 开场：硝烟弥漫的废墟大道，无畏机甲从画面左方入画，沿大道向画面右前方稳步推进，右臂爆弹炮向右前方深处的兽人潮持续点射，炮口火舌喷吐，密集的兽人从瓦砾后嚎叫着涌出。 [Shot 2] At 00:02.500 机甲脚步不停继续向右前方推进，弹壳抛落，兽人潮迎着炮火逼近。收尾状态：机甲面朝右前方行进中，机位不变。\\noverall_soundscape: 爆弹轰鸣、兽人嘶吼、沉重脚步声、远处爆炸。\\nnon_diegetic_music: 战鼓渐强，紧张气氛升温。\",\"nonce\":\"dread1\",\"assets\":[]},{\"duration\":5,\"prompt\":\"integrated_multimodal_description: [Shot 1] 承接上段：机甲面朝右前方推进中，机位不变。兽人扑到近前，机甲左臂动力拳横扫将它们砸飞，脚步不停，腰间链锯剑仍未出鞘。 [Shot 2] At 00:02.500 机甲边行进边挥拳，又一拳击碎一头跃起的兽人，火花与血雾迸溅，继续向右前方推进。收尾状态：机甲仍在行进，兽人攻势减弱。\\noverall_soundscape: 金属撞击、重拳闷响、兽人哀嚎、液压轰鸣。\\nnon_diegetic_music: 凶猛打击乐，持续激战节奏。\",\"nonce\":\"dread2\",\"assets\":[]},{\"duration\":5,\"prompt\":\"integrated_multimodal_description: [Shot 1] 承接上段：机甲向右前方推进，机位不变。兽人潮在重火力与重拳下溃散，转身向画面右方深处奔逃，机甲踏着燃烧的残骸继续前进，爆弹炮向逃敌点射。 [Shot 2] At 00:02.500 大道前方兽人渐稀，硝烟深处隐约有巨大轮廓晃动，机甲保持节奏向右前方稳步推进。收尾状态：机甲行进中，大道深处有异动。\\noverall_soundscape: 爆炸轰鸣、火焰噼啪、溃逃兽人呼喊、隐约的低沉咆哮。\\nnon_diegetic_music: 战鼓暂歇，低音铜管暗流涌动，酝酿更大风暴。\",\"nonce\":\"dread3\",\"assets\":[]}]}",
@@ -339,7 +339,7 @@
   },
   {
    "id": 10,
-   "type": "H3StoryDirectorChain",
+   "type": "H3SceneDirectorChain",
    "pos": [
     40,
     40
@@ -541,7 +541,7 @@
     }
    ],
    "properties": {
-    "Node name for S&R": "H3StoryDirectorChain"
+    "Node name for S&R": "H3SceneDirectorChain"
    },
    "widgets_values": [
     1344,
@@ -1087,7 +1087,7 @@
   },
   {
    "id": 22,
-   "type": "H3StoryDirectorConditioning",
+   "type": "H3SceneDirectorConditioning",
    "pos": [
     -450,
     40
@@ -1156,7 +1156,7 @@
     }
    ],
    "properties": {
-    "Node name for S&R": "H3StoryDirectorConditioning"
+    "Node name for S&R": "H3SceneDirectorConditioning"
    },
    "widgets_values": [
     1344,

@@ -1,5 +1,5 @@
-"""StoryDirector 运行缓存：每段的工件落在
-``output/h3_storydirector/<run>/``。
+"""SceneDirector 运行缓存：每段的工件落在
+``output/h3_scenedirector/<run>/``。
 
 每个渲染完的段会持久化三样东西：无损 AV latent（``seg_XXXX.safetensors``，
 同时充当下一段运动上下文的来源）、可看的 mp4、工作台海报图，外加驱动
@@ -22,7 +22,7 @@ from comfy_api.latest import InputImpl, Types
 from ..core.motion_context import streams_from_av
 from .payload import FPS
 
-CACHE_ROOT = "h3_storydirector"
+CACHE_ROOT = "h3_scenedirector"
 
 
 def run_dir(run):

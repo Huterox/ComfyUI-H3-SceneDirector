@@ -1,7 +1,7 @@
-// storydirector.js —— 前端扩展入口（薄）。
+// scenedirector.js —— 前端扩展入口（薄）。
 //
 // ComfyUI 把 js/ 根目录的 .js 当扩展自动加载（WEB_DIRECTORY="./js"），
-// 本文件被服务在 /extensions/<包名>/storydirector.js，所以到 scripts/
+// 本文件被服务在 /extensions/<包名>/scenedirector.js，所以到 scripts/
 // 的相对路径是 ../../../。js/workbench/ 下的模块一律不 import app/api，
 // 由这里注入。
 
@@ -9,10 +9,10 @@ import { app } from "../../../scripts/app.js";
 import { api } from "../../../scripts/api.js";
 import { attachWorkbench } from "./workbench/main.js";
 
-const NODE_TYPE = "H3StoryDirectorList";
+const NODE_TYPE = "H3SceneDirectorList";
 
 app.registerExtension({
-    name: "H3.StoryDirector.Workbench",
+    name: "H3.SceneDirector.Workbench",
 
     async beforeRegisterNodeDef(nodeType, nodeData) {
         if (nodeData.name !== NODE_TYPE) return;

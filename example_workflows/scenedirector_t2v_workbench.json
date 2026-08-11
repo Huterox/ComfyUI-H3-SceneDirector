@@ -279,7 +279,7 @@
   },
   {
    "id": 9,
-   "type": "H3StoryDirectorList",
+   "type": "H3SceneDirectorList",
    "pos": [
     430,
     40
@@ -324,7 +324,7 @@
     }
    ],
    "properties": {
-    "Node name for S&R": "H3StoryDirectorList"
+    "Node name for S&R": "H3SceneDirectorList"
    },
    "widgets_values": [
     "{\"run\": \"demo_scene\", \"run_nonce\": 0, \"global_prompt\": \"Main character (consistent throughout): the ancient dreadnought mech from <Picture 1> - sarcophagus-class heavy frame, grey-black battle-worn paint, heavy bolter right arm, power fist left arm, chainsword at the hip. Enemies: a green-skinned ork horde.\", \"globals\": [{\"category\": \"Visual style\", \"content\": \"cinematic 3D CG, grim-dark tone, volumetric smoke and firelight\"}, {\"category\": \"World\", \"content\": \"a ruined battlefield of ash and smoke; one straight ruined avenue, rubble and fires in the distance\"}, {\"category\": \"Blocking & camera\", \"content\": \"the dreadnought advances along the avenue toward screen right-front through the WHOLE film; fixed low-angle tracking camera at its front-left; orks appear from deep right and flee back to deep right\"}, {\"category\": \"Music\", \"content\": \"heavy war drums and low brass, intensity follows the battle\"}], \"assets\": [], \"segments\": [{\"duration\": 5.0, \"nonce\": \"d1\", \"assets\": [], \"prompt\": \"integrated_multimodal_description: [Shot 1] Opening: on the smoke-filled ruined avenue, the dreadnought enters from screen left and advances steadily toward screen right-front, its right-arm bolter firing bursts into the ork tide deep ahead, muzzle flashes spitting. [Shot 2] At 00:02.500 it keeps advancing without breaking stride, shell casings scattering, orks pour howling from behind the rubble. Exit state: still advancing, camera unchanged.\\noverall_soundscape: bolter roar, ork war-cries, heavy footsteps, distant explosions.\\nnon_diegetic_music: war drums rising, tension building.\"}, {\"duration\": 5.0, \"nonce\": \"d2\", \"assets\": [], \"prompt\": \"integrated_multimodal_description: [Shot 1] Continuing: the dreadnought still advances right-forward, camera unchanged. Orks reach melee range; its left power fist sweeps them away without breaking stride. [Shot 2] At 00:02.500 it punches a leaping ork mid-air while walking, sparks and blood mist bursting, still advancing. Exit state: advancing, ork assault weakening.\\noverall_soundscape: metal impacts, heavy blows, ork wails, hydraulic roars.\\nnon_diegetic_music: fierce percussion, sustained battle rhythm.\"}, {\"duration\": 5.0, \"nonce\": \"d3\", \"assets\": [], \"prompt\": \"integrated_multimodal_description: [Shot 1] Continuing: same advance, camera unchanged. The ork tide breaks and flees back into the deep right; the dreadnought strides over burning wreckage, bolter picking off runners. [Shot 2] At 00:02.500 the avenue ahead empties, smoke and firelight painting the sky red, the dreadnought keeps its pace. Exit state: advancing, avenue clearing.\\noverall_soundscape: huge explosions, crackling flames, fleeing cries, echoing war-horns.\\nnon_diegetic_music: triumphant drums and brass, strong cadence.\"}]}",
@@ -333,7 +333,7 @@
   },
   {
    "id": 10,
-   "type": "H3StoryDirectorChain",
+   "type": "H3SceneDirectorChain",
    "pos": [
     1040,
     40
@@ -535,7 +535,7 @@
     }
    ],
    "properties": {
-    "Node name for S&R": "H3StoryDirectorChain"
+    "Node name for S&R": "H3SceneDirectorChain"
    },
    "widgets_values": [
     1344,
@@ -1151,7 +1151,7 @@
   },
   {
    "id": 22,
-   "type": "H3StoryDirectorConditioning",
+   "type": "H3SceneDirectorConditioning",
    "pos": [
     620,
     40
@@ -1220,7 +1220,7 @@
     }
    ],
    "properties": {
-    "Node name for S&R": "H3StoryDirectorConditioning"
+    "Node name for S&R": "H3SceneDirectorConditioning"
    },
    "widgets_values": [
     1344,

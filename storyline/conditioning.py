@@ -63,7 +63,7 @@ def load_ref_image(image, subfolder=""):
     path = _input_file_path(image, subfolder)
     if not os.path.isfile(path):
         raise FileNotFoundError(
-            "h3_storydirector: 参考图 %r 不存在（查找路径 %s）。"
+            "h3_scenedirector: 参考图 %r 不存在（查找路径 %s）。"
             "请通过工作台的资产卡上传。" % (image, path))
     img = Image.open(path).convert("RGB")
     arr = np.asarray(img, dtype=np.float32) / 255.0

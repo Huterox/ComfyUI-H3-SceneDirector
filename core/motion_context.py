@@ -1,4 +1,4 @@
-"""运动上下文（StoryDirector 自研实现）：把上一段尾部的一串帧连同声音
+"""运动上下文（SceneDirector 自研实现）：把上一段尾部的一串帧连同声音
 钉进下一段的条件，让画面和声音真正续接，而不是从一张静帧猜运动。
 
 原理：上一段尾部 n 帧经视频 VAE 编成 latent，作为一串"永不去噪"的
@@ -21,7 +21,7 @@ import node_helpers
 from .patch_layout import MC_KEY, MC_AUDIO_KEY, is_applied as layout_ok
 from .patch_payload import is_applied as payload_ok
 
-_LOG = logging.getLogger("h3_storydirector")
+_LOG = logging.getLogger("h3_scenedirector")
 
 FPS = 24                    # H3 原生帧率；音频 latent 40Hz，故时间缩放 5/3
 FRAME_PER_TOKEN = (1, 4, 4, 4, 4)
@@ -56,10 +56,10 @@ def streams_from_av(latent):
     elif isinstance(samples, (tuple, list)):
         parts = list(samples)
     else:
-        raise ValueError("h3_storydirector: 预期是 MiniMax H3 的 AV latent"
+        raise ValueError("h3_scenedirector: 预期是 MiniMax H3 的 AV latent"
                          "（video/audio 嵌套对），实际 %r" % type(samples))
     if not parts:
-        raise ValueError("h3_storydirector: AV latent 里没有任何流")
+        raise ValueError("h3_scenedirector: AV latent 里没有任何流")
     return parts
 
 
@@ -68,7 +68,7 @@ def _video_of(latent):
     if video.ndim == 4:      # 无 batch 维 [C,T,H,W]
         video = video.unsqueeze(0)
     if video.ndim != 5:
-        raise ValueError("h3_storydirector: 预期视频 latent [B,C,T,H,W]，"
+        raise ValueError("h3_scenedirector: 预期视频 latent [B,C,T,H,W]，"
                          "实际 %s" % (tuple(video.shape),))
     return video
 
@@ -90,13 +90,13 @@ def _encode_tail_audio(audio_vae, audio, seconds):
             import torchaudio
         except ImportError:
             raise RuntimeError(
-                "h3_storydirector: 上下文音频是 %d Hz，VAE 要 %d Hz，"
+                "h3_scenedirector: 上下文音频是 %d Hz，VAE 要 %d Hz，"
                 "且没有 torchaudio 可重采样。" % (sr, vae_sr))
         waveform = torchaudio.functional.resample(waveform, sr, vae_sr)
     want = int(round(seconds * vae_sr))
     have = int(waveform.shape[-1])
     if have < want:
-        _LOG.warning("h3_storydirector: 上下文音频只有 %.3fs，不足钉帧窗口的 "
+        _LOG.warning("h3_scenedirector: 上下文音频只有 %.3fs，不足钉帧窗口的 "
                      "%.3fs，有多少钉多少。", have / vae_sr, seconds)
     else:
         waveform = waveform[..., have - want:]
@@ -117,7 +117,7 @@ def apply_motion_context(conditioning, vae, latent, context_frames, context_leng
     """
     if not layout_ok():
         raise RuntimeError(
-            "h3_storydirector: 布局补丁未生效，内部锚点会被 ComfyUI 拒绝。"
+            "h3_scenedirector: 布局补丁未生效，内部锚点会被 ComfyUI 拒绝。"
             "看启动日志里自检失败的原因。")
 
     video = _video_of(latent)
@@ -129,22 +129,22 @@ def apply_motion_context(conditioning, vae, latent, context_frames, context_leng
     available = int(context_frames.shape[0])
     n = min(int(context_length), available)
     if n < 1:
-        raise ValueError("h3_storydirector: 上下文帧为空")
+        raise ValueError("h3_scenedirector: 上下文帧为空")
     if n < context_length:
-        _LOG.warning("h3_storydirector: 只拿到 %d 帧，钉 %d 帧", available, n)
+        _LOG.warning("h3_scenedirector: 只拿到 %d 帧，钉 %d 帧", available, n)
 
     if encode_mode == "video":
         # 先吸附网格再切片：否则 VAE 覆盖的是输入前段，钉住的尾部会提前
         # 结束，接缝错位
         run = next(g for g in VIDEO_RUN_GRID if g <= n)
         if run != n:
-            _LOG.warning("h3_storydirector: %d 帧不在 VAE 网格上，改钉最后 "
+            _LOG.warning("h3_scenedirector: %d 帧不在 VAE 网格上，改钉最后 "
                          "%d 帧（可用网格 1/5/22/39）", n, run)
         n = run
 
     if n >= frame_count:
         raise ValueError(
-            "h3_storydirector: 往 %d 帧的片段里钉 %d 帧——钉帧只能是时间轴的"
+            "h3_scenedirector: 往 %d 帧的片段里钉 %d 帧——钉帧只能是时间轴的"
             "一小段。" % (n, frame_count))
 
     # 取上一段的最后 n 帧作为钉帧串
@@ -155,7 +155,7 @@ def apply_motion_context(conditioning, vae, latent, context_frames, context_leng
         enc = vae.encode(tail)
         if getattr(enc, "ndim", 0) != 5:
             raise ValueError(
-                "h3_storydirector: video 模式编码返回 %s，预期 [B,C,T,H,W]。"
+                "h3_scenedirector: video 模式编码返回 %s，预期 [B,C,T,H,W]。"
                 "可改用 encode_mode=frames。" % (tuple(getattr(enc, "shape", ())),))
         steps = int(enc.shape[2])
         offsets = step_starts(steps)
@@ -164,7 +164,7 @@ def apply_motion_context(conditioning, vae, latent, context_frames, context_leng
             # n 已吸附网格，不一致说明上游 VAE 改了降采样公式——
             # 钉内容与位置对不上，宁可拒绝也不渲染错位接缝
             raise RuntimeError(
-                "h3_storydirector: %d 帧编出 %d 步覆盖 %d 帧；VAE 网格与"
+                "h3_scenedirector: %d 帧编出 %d 步覆盖 %d 帧；VAE 网格与"
                 " VIDEO_RUN_GRID 不再匹配，拒绝运行。" % (n, steps, covered))
         blocks = [enc[:, :, k:k + 1] for k in range(steps)]
         span = covered
@@ -194,10 +194,10 @@ def apply_motion_context(conditioning, vae, latent, context_frames, context_leng
     if context_audio is not None:
         if not payload_ok():
             raise RuntimeError(
-                "h3_storydirector: 载荷补丁未生效，音频参考会覆盖钉帧的"
+                "h3_scenedirector: 载荷补丁未生效，音频参考会覆盖钉帧的"
                 " latent。看启动日志。")
         if audio_vae is None:
-            raise ValueError("h3_storydirector: 带了上下文音频但没接音频 VAE。")
+            raise ValueError("h3_scenedirector: 带了上下文音频但没接音频 VAE。")
         a_frames = int(audio_context_length) or span
         audio_latent, ref_audio_t = _encode_tail_audio(
             audio_vae, context_audio, a_frames / float(FPS))
@@ -220,7 +220,7 @@ def apply_motion_context(conditioning, vae, latent, context_frames, context_leng
     out = node_helpers.conditioning_set_values(conditioning, values)
 
     trim = span if anchor_mode == "head" else 0
-    _LOG.info("h3_storydirector: %s/%s，%d 帧 -> %d 个条件块，位置 %d..%d，"
+    _LOG.info("h3_scenedirector: %s/%s，%d 帧 -> %d 个条件块，位置 %d..%d，"
               "%d 帧片段 %dx%d，trim %d，音频 %s",
               encode_mode, anchor_mode, n, len(keyframes),
               indices[0], indices[-1], frame_count, width, height, trim,
@@ -244,7 +244,7 @@ def trim_av(images, audio, trim_frames, fps=24.0, match_tail=True):
     n = max(0, int(trim_frames))
     total = int(images.shape[0])
     if n >= total:
-        raise ValueError("h3_storydirector: 从 %d 帧的片段裁 %d 帧没东西剩。"
+        raise ValueError("h3_scenedirector: 从 %d 帧的片段裁 %d 帧没东西剩。"
                          % (total, n))
     out_images = images[n:] if n else images
 
@@ -256,7 +256,7 @@ def trim_av(images, audio, trim_frames, fps=24.0, match_tail=True):
         length = int(waveform.shape[-1])
         if cut >= length:
             raise ValueError(
-                "h3_storydirector: 从 %.3fs 音频裁 %.3fs 就没声了。检查 fps 是否"
+                "h3_scenedirector: 从 %.3fs 音频裁 %.3fs 就没声了。检查 fps 是否"
                 "与片段一致。" % (length / sr, n / float(fps)))
         waveform = waveform[..., cut:]
         if match_tail:
@@ -266,14 +266,14 @@ def trim_av(images, audio, trim_frames, fps=24.0, match_tail=True):
             if have > want:
                 waveform = waveform[..., :want]
             elif have < want:
-                _LOG.warning("h3_storydirector: 音频比 %d 帧短 %.2fms，尾部保持原样",
+                _LOG.warning("h3_scenedirector: 音频比 %d 帧短 %.2fms，尾部保持原样",
                              frames_left, (want - have) / sr * 1000.0)
         out_audio = {"waveform": waveform, "sample_rate": sr}
-        _LOG.info("h3_storydirector: %d 帧 / %.4fs 画面，%.4fs 声音，漂移 %.2fms",
+        _LOG.info("h3_scenedirector: %d 帧 / %.4fs 画面，%.4fs 声音，漂移 %.2fms",
                   total - n, (total - n) / float(fps),
                   int(waveform.shape[-1]) / sr,
                   abs((total - n) / float(fps) - int(waveform.shape[-1]) / sr) * 1000.0)
     elif n:
-        _LOG.info("h3_storydirector: 裁掉头部 %d 帧，剩 %d 帧（未接音频）",
+        _LOG.info("h3_scenedirector: 裁掉头部 %d 帧，剩 %d 帧（未接音频）",
                   n, total - n)
     return out_images, out_audio

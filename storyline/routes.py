@@ -1,4 +1,4 @@
-"""StoryDirector 的后端路由：工作台前端 POST 当前分镜行，
+"""SceneDirector 的后端路由：工作台前端 POST 当前分镜行，
 拿回逐段缓存状态（哈希匹配 + latent 落盘情况）、级联点、
 缩略图/段内回放的工件名。
 """
@@ -13,7 +13,7 @@ from . import payload as P
 from . import cache as C
 
 
-@PromptServer.instance.routes.post("/h3_storydirector/status")
+@PromptServer.instance.routes.post("/h3_scenedirector/status")
 async def status(request):
     try:
         body = await request.json()

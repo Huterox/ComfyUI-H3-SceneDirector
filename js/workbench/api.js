@@ -1,10 +1,10 @@
 // api.js —— 后端通道封装。
 //
 // 这里不 import ComfyUI 的 app/api（js/workbench/ 下的模块一律由入口
-// storydirector.js 注入依赖，避免再数一遍到 scripts/ 的相对路径层级）。
+// scenedirector.js 注入依赖，避免再数一遍到 scripts/ 的相对路径层级）。
 //
 // 封装四件事：
-//   postStatus     POST /h3_storydirector/status（payload 子集 -> 逐段状态）
+//   postStatus     POST /h3_scenedirector/status（payload 子集 -> 逐段状态）
 //   uploadImage    POST /upload/image（FormData 字段名必须是 image）
 //   *URL           /view 工件 URL 构造（海报 / mp4 / 输入目录参考图）
 //   onProgress / onExecutionEnd   WS 事件订阅（api.addEventListener），
@@ -14,7 +14,7 @@ export function createBackend(api) {
 
     // 编辑后由 progress.js 防抖 800ms 调用；body 形状见 state.statusBody()
     async function postStatus(body) {
-        const resp = await api.fetchApi("/h3_storydirector/status", {
+        const resp = await api.fetchApi("/h3_scenedirector/status", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(body),
@@ -55,26 +55,26 @@ export function createBackend(api) {
         return api.apiURL(viewQuery(card.image, card.subfolder || "", "input"));
     }
 
-    // 海报：output/h3_storydirector/<run>/posters/<poster_file>
+    // 海报：output/h3_scenedirector/<run>/posters/<poster_file>
     const posterURL = (run, file, cacheTag) =>
-        outputURL(file, "h3_storydirector/" + run + "/posters", cacheTag);
+        outputURL(file, "h3_scenedirector/" + run + "/posters", cacheTag);
 
-    // 段视频：output/h3_storydirector/<run>/<mp4_file>
+    // 段视频：output/h3_scenedirector/<run>/<mp4_file>
     const mp4URL = (run, file, cacheTag) =>
-        outputURL(file, "h3_storydirector/" + run, cacheTag);
+        outputURL(file, "h3_scenedirector/" + run, cacheTag);
 
     // WS：渲染进度 {run, segment, total, cached}
     function onProgress(fn) {
         const handler = (ev) => fn(ev.detail || {});
-        api.addEventListener("h3_storydirector_progress", handler);
-        return () => api.removeEventListener("h3_storydirector_progress", handler);
+        api.addEventListener("h3_scenedirector_progress", handler);
+        return () => api.removeEventListener("h3_scenedirector_progress", handler);
     }
 
     // WS：逐步实时预览 {run, segment, total, step, steps, image(base64 jpeg)}
     function onStep(fn) {
         const handler = (ev) => fn(ev.detail || {});
-        api.addEventListener("h3_storydirector_step", handler);
-        return () => api.removeEventListener("h3_storydirector_step", handler);
+        api.addEventListener("h3_scenedirector_step", handler);
+        return () => api.removeEventListener("h3_scenedirector_step", handler);
     }
 
     // WS：一次执行结束后刷新全部状态

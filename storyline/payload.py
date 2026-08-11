@@ -1,4 +1,4 @@
-"""StoryDirector 载荷层：schema、规范化、提示词拼装、哈希。
+"""SceneDirector 载荷层：schema、规范化、提示词拼装、哈希。
 
 本模块只允许纯函数——不 import ComfyUI 的任何东西——这样
 "什么改动会让缓存段失效"这条规则就可以离线单测。
@@ -15,7 +15,7 @@
   segments      [{duration, prompt, nonce, assets}] 逐动作行；
                 段级资产的 <Picture> 序号排在全局图之后
 
-缓存哈希标签当前为 "sd4"：StoryDirector 的哈希规则与旧包 H3-Motion-Context
+缓存哈希标签当前为 "sd4"：SceneDirector 的哈希规则与旧包 H3-Motion-Context
 的 story chain（标签 "v2"）一致，但两个包即使缓存根目录被指到同一个
 文件夹也绝不能共享缓存条目，所以标签刻意不同。语义发生变化的引擎
 修正会递进标签（sd3 -> sd4：连续性锚点改到交付尾部），旧缓存自动作废。

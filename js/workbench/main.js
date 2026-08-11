@@ -31,7 +31,7 @@ import { createStage } from "./stage.js";
 import { createDetail } from "./detail.js";
 import { createProgress } from "./progress.js";
 
-const STYLE_ID = "h3-storydirector-style";
+const STYLE_ID = "h3-scenedirector-style";
 // 工作台的最小可用高度（前端布局保证不会比这个更小）
 const MIN_H = 620;
 
@@ -89,7 +89,7 @@ export function attachWorkbench(node, { app, api }) {
     bar.appendChild(el("span", "lbl", "场景"));
     const runInput = el("input", "h3wb-run");
     runInput.type = "text";
-    runInput.title = "run 名 = 缓存目录名（output/h3_storydirector/<run>/）；换名即开新场景";
+    runInput.title = "run 名 = 缓存目录名（output/h3_scenedirector/<run>/）；换名即开新场景";
     runInput.value = runWidget ? String(runWidget.value ?? "") : store.get().run;
     runInput.addEventListener("input", () => {
         const v = runInput.value;

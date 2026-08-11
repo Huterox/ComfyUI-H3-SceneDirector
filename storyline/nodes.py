@@ -1,10 +1,10 @@
-"""StoryDirector 的 ComfyUI 节点类（薄壳）。
+"""SceneDirector 的 ComfyUI 节点类（薄壳）。
 
 设计原则：不做上帝节点。
-  H3StoryDirectorList          工作台数据载体（载荷 -> SEGMENTS）
-  H3StoryDirectorConditioning  文本侧：逐段条件编码，发生在明面上
-  H3StoryDirectorChain         纯衔接：钉帧 -> 采样 -> 解码 -> 缓存 -> 拼接
-  H3StoryDirectorLatentTemplate 统一渲染窗口的空 AV latent（给会校验
+  H3SceneDirectorList          工作台数据载体（载荷 -> SEGMENTS）
+  H3SceneDirectorConditioning  文本侧：逐段条件编码，发生在明面上
+  H3SceneDirectorChain         纯衔接：钉帧 -> 采样 -> 解码 -> 缓存 -> 拼接
+  H3SceneDirectorLatentTemplate 统一渲染窗口的空 AV latent（给会校验
                                打包尺寸的采样器，如 MultiRate T8）
 
 采样配置（model 补丁、sampler、sigmas、negative/cfg）全部走接线。
@@ -60,7 +60,7 @@ def _default_payload():
     }
 
 
-class H3StoryDirectorList:
+class H3SceneDirectorList:
     """导演工作台的数据载体。js/workbench 前端把载荷渲染成分镜时间线
     （场景设定表、资产卡、逐段缩略图/状态/重摇/资产图钉）；本节点把
     run 名钉进去，把载荷交给编码头和链条。"""
@@ -78,7 +78,7 @@ class H3StoryDirectorList:
                 }),
                 "run_name": ("STRING", {
                     "default": "story",
-                    "tooltip": "本次 run 的缓存目录名（output/h3_storydirector/ 下）。"
+                    "tooltip": "本次 run 的缓存目录名（output/h3_scenedirector/ 下）。"
                                "一次 run = 一个场景；换名即开新场景。",
                 }),
             }
@@ -95,13 +95,13 @@ class H3StoryDirectorList:
         run, run_nonce, global_prompt, globals_rows, assets, segs = P.parse_payload(segments)
         run = P.sanitize_run(run_name) if str(run_name or "").strip() else run
         if not segs:
-            raise ValueError("H3StoryDirectorList: 至少加一段带提示词的分镜")
+            raise ValueError("H3SceneDirectorList: 至少加一段带提示词的分镜")
         payload = {"run": run, "run_nonce": run_nonce, "global_prompt": global_prompt,
                    "globals": globals_rows, "assets": assets, "segments": segs}
         return (json.dumps(payload, ensure_ascii=False),)
 
 
-class H3StoryDirectorConditioning:
+class H3SceneDirectorConditioning:
     """逐段文本/参考图条件，在衔接引擎之外构建，文本编码器侧保持可hack。
 
     每段拼出完整提示词（场景设定表 + 资产清单 + 段提示词 + 段级资产
@@ -139,7 +139,7 @@ class H3StoryDirectorConditioning:
                                     first_frame=first_frame),)
 
 
-class H3StoryDirectorChain:
+class H3SceneDirectorChain:
     """特征上下文窗口衔接 + 增量重渲驱动。刻意只是衔接：
 
       * KSamplerSelect  -> sampler  (SAMPLER)
@@ -148,7 +148,7 @@ class H3StoryDirectorChain:
       * 可选 negative (CONDITIONING) + cfg widget 做引导采样
         （不接 negative 时保持官方 H3 的仅正条件行为）
 
-    缓存：每段落盘 output/h3_storydirector/<run>/，只从第一个变动段
+    缓存：每段落盘 output/h3_scenedirector/<run>/，只从第一个变动段
     起级联重渲。"""
 
     @classmethod
@@ -206,7 +206,7 @@ class H3StoryDirectorChain:
     FUNCTION = "chain"
     CATEGORY = "conditioning/minimax"
     DESCRIPTION = ("特征上下文窗口衔接（运动上下文）+ 增量重渲。每段缓存到 "
-                   "output/h3_storydirector/<run>/，只从第一个变动段起重渲。")
+                   "output/h3_scenedirector/<run>/，只从第一个变动段起重渲。")
 
     def chain(self, model, vae, audio_vae, segments, story_cond, sampler, sigmas,
               width, height, seed, context_length, audio_context_length,
@@ -220,7 +220,7 @@ class H3StoryDirectorChain:
             negative=negative)
 
 
-class H3StoryDirectorLatentTemplate:
+class H3SceneDirectorLatentTemplate:
     """与链条逐段渲染窗口一致的空 AV latent。
 
     会按模板校验打包 latent 尺寸的采样器（MultiRate T8 在尺寸不符时
@@ -260,15 +260,15 @@ class H3StoryDirectorLatentTemplate:
 
 
 NODE_CLASS_MAPPINGS = {
-    "H3StoryDirectorList": H3StoryDirectorList,
-    "H3StoryDirectorConditioning": H3StoryDirectorConditioning,
-    "H3StoryDirectorChain": H3StoryDirectorChain,
-    "H3StoryDirectorLatentTemplate": H3StoryDirectorLatentTemplate,
+    "H3SceneDirectorList": H3SceneDirectorList,
+    "H3SceneDirectorConditioning": H3SceneDirectorConditioning,
+    "H3SceneDirectorChain": H3SceneDirectorChain,
+    "H3SceneDirectorLatentTemplate": H3SceneDirectorLatentTemplate,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "H3StoryDirectorList": "H3 Scene Director List (工作台)",
-    "H3StoryDirectorConditioning": "H3 Scene Director Conditioning",
-    "H3StoryDirectorChain": "H3 Scene Director Chain",
-    "H3StoryDirectorLatentTemplate": "H3 Scene Director Latent Template",
+    "H3SceneDirectorList": "H3 Scene Director List (工作台)",
+    "H3SceneDirectorConditioning": "H3 Scene Director Conditioning",
+    "H3SceneDirectorChain": "H3 Scene Director Chain",
+    "H3SceneDirectorLatentTemplate": "H3 Scene Director Latent Template",
 }

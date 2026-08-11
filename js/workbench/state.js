@@ -110,7 +110,7 @@ export function serializePayload(state) {
     });
 }
 
-// POST /h3_storydirector/status 的请求体：payload 子集。段不按 prompt 过滤
+// POST /h3_scenedirector/status 的请求体：payload 子集。段不按 prompt 过滤
 // （后端按行索引对齐 statuses，UI 上的空提示词新段也要有徽标位置），
 // 但每段的键必须齐全（后端 seg_hash 直接取 duration/prompt/nonce）。
 export function statusBody(state, runName) {
@@ -139,7 +139,7 @@ export function globalPicCount(state) {
 }
 
 // ---------------------------------------------------------------------------
-// 状态仓库：一个 H3StoryDirectorList 节点一个实例。
+// 状态仓库：一个 H3SceneDirectorList 节点一个实例。
 // ---------------------------------------------------------------------------
 //
 // 组件直接改 get() 返回的对象（引用稳定），改完调 commit()：

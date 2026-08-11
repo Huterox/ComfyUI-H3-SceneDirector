@@ -32,10 +32,10 @@ from . import cache as C
 from .conditioning import build_cond, load_ref_image, encode_refs, MAX_REFS
 from .colorlock import stats as cl_stats, match_smooth as cl_match
 
-_LOG = logging.getLogger("h3_storydirector")
+_LOG = logging.getLogger("h3_scenedirector")
 
-PROGRESS_EVENT = "h3_storydirector_progress"
-STEP_EVENT = "h3_storydirector_step"   # 逐步实时预览
+PROGRESS_EVENT = "h3_scenedirector_progress"
+STEP_EVENT = "h3_scenedirector_step"   # 逐步实时预览
 
 
 class _BasicGuider(comfy.samplers.CFGGuider):
@@ -81,7 +81,7 @@ def encode_story(clip, vae, segments_raw, width, height, first_frame=None):
     视频 VAE 编码，输出逐段 CONDITIONING 列表。链条节点只管消费。"""
     run, run_nonce, global_prompt, globals_rows, assets, segs = P.parse_payload(segments_raw)
     if not segs:
-        raise ValueError("H3StoryDirector: 载荷里没有任何段")
+        raise ValueError("H3SceneDirector: 载荷里没有任何段")
     global_block = P.compose_global(global_prompt, globals_rows, assets)
     n_global_pics = sum(1 for a in assets if a["image"])
 
@@ -182,17 +182,17 @@ def run_chain(model, vae, audio_vae, segments_raw, story_cond, sampler, sigmas,
     返回 (images, audio, contact_sheet, info)。"""
     run, run_nonce, global_prompt, globals_rows, assets, segs = P.parse_payload(segments_raw)
     if not segs:
-        raise ValueError("H3StoryDirector: 请至少加一段带提示词的分镜")
+        raise ValueError("H3SceneDirector: 请至少加一段带提示词的分镜")
 
     conds = list((story_cond or {}).get("conds") or [])
     if len(conds) != len(segs):
         raise ValueError(
-            "H3StoryDirector: story_cond 带了 %d 个段条件，但载荷有 %d 段。"
+            "H3SceneDirector: story_cond 带了 %d 个段条件，但载荷有 %d 段。"
             "两个输入请接同一个 StoryList。" % (len(conds), len(segs)))
     if (int(story_cond.get("width", width)), int(story_cond.get("height", height))) \
             != (int(width), int(height)):
         raise ValueError(
-            "H3StoryDirector: 画布不一致——story_cond 按 %dx%d 编码，链条设的是 "
+            "H3SceneDirector: 画布不一致——story_cond 按 %dx%d 编码，链条设的是 "
             "%dx%d。两处宽高请接同一个 ResolutionSelector。"
             % (story_cond.get("width"), story_cond.get("height"), width, height))
 
@@ -277,7 +277,7 @@ def run_chain(model, vae, audio_vae, segments_raw, story_cond, sampler, sigmas,
             positive = conds[i]
             if positive is None:
                 raise ValueError(
-                    "H3StoryDirector: 段 %d 的条件为空，请重跑编码头。" % (i + 1))
+                    "H3SceneDirector: 段 %d 的条件为空，请重跑编码头。" % (i + 1))
             want = max(5, round(seg["duration"] * P.FPS))
             if i > 0:
                 # head 模式钉帧会把上一段尾部的 span 帧复制进本段输出，

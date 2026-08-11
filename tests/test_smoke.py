@@ -204,8 +204,8 @@ def main():
 
     # 四个工作台节点注册
     import json
-    for name in ("H3StoryDirectorList", "H3StoryDirectorConditioning",
-                 "H3StoryDirectorChain", "H3StoryDirectorLatentTemplate"):
+    for name in ("H3SceneDirectorList", "H3SceneDirectorConditioning",
+                 "H3SceneDirectorChain", "H3SceneDirectorLatentTemplate"):
         assert name in pkg.NODE_CLASS_MAPPINGS, name
     assert pl.base_length(5.0) == 124    # 120 向上对齐 17 帧网格
     assert pl.base_length(6.0) == 158

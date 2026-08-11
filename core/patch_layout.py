@@ -1,4 +1,4 @@
-"""运动上下文布局补丁（StoryDirector 自研实现）。
+"""运动上下文布局补丁（SceneDirector 自研实现）。
 
 要解决的问题：MiniMax H3 官方的 PackedLayout 只接受钉在第 0 帧或最后一帧
 的关键帧，其余像素位置一律拒绝。而链接长视频需要把上一段尾部的一串帧
@@ -28,7 +28,7 @@ import comfy.ldm.minimax.model as mm
 
 MC_KEY = "motion_context_index"               # 关键帧的真实像素位置
 MC_AUDIO_KEY = "motion_context_audio_end_frame"  # 音频窗的结束帧（目标时间轴）
-_LOG = logging.getLogger("h3_storydirector")
+_LOG = logging.getLogger("h3_scenedirector")
 
 _orig_init = None
 _applied = False
@@ -76,12 +76,12 @@ def _rewrite_keyframes(layout, text_len, latent_t, frame_count, keyframes, refs=
         # 官方关键帧不补游标位移，和我们的钉帧混用在同一张图里再加参考块，
         # 两类锚点会相对目标错位。目前没有这样的用法——出现就大声拒绝。
         raise RuntimeError(
-            "h3_storydirector: 官方关键帧与运动上下文钉帧混用且带参考块，"
+            "h3_scenedirector: 官方关键帧与运动上下文钉帧混用且带参考块，"
             "坐标会互相错位。请给所有关键帧都带 %s 标记，或移除参考块。" % MC_KEY)
     cond_spans = [(a, b) for a, b, kind in layout.segments if kind == "cond"]
     if len(cond_spans) != len(keyframes):
         raise RuntimeError(
-            "h3_storydirector: 关键帧 %d 个，布局里 cond 段 %d 个，拒绝改写坐标。"
+            "h3_scenedirector: 关键帧 %d 个，布局里 cond 段 %d 个，拒绝改写坐标。"
             % (len(keyframes), len(cond_spans)))
     for (a, b), kf in zip(cond_spans, keyframes):
         p = kf.get(MC_KEY)
@@ -102,18 +102,18 @@ def _move_audio_ref(layout, text_len, refs):
     marked = [r for r in refs if r.get(MC_AUDIO_KEY) is not None]
     if len(marked) != 1:
         raise RuntimeError(
-            "h3_storydirector: 音频时间轴安放只支持恰好一个带标记的音频参考块；"
+            "h3_scenedirector: 音频时间轴安放只支持恰好一个带标记的音频参考块；"
             "当前 %d 个参考块、%d 个带标记。" % (len(refs), len(marked)))
     blk = marked[0]
     if blk.get("kind") != "audio":
         raise RuntimeError(
-            "h3_storydirector: %s 标在了 %r 参考块上；只有音频参考块能移到时间轴。"
+            "h3_scenedirector: %s 标在了 %r 参考块上；只有音频参考块能移到时间轴。"
             % (MC_AUDIO_KEY, blk.get("kind")))
     kinds = set(r.get("kind") for r in refs)
     if not kinds <= {"image", "audio"} \
             or sum(1 for r in refs if r.get("kind") == "audio") != 1:
         raise RuntimeError(
-            "h3_storydirector: 音频时间轴安放支持若干图片参考块 + 恰好一个"
+            "h3_scenedirector: 音频时间轴安放支持若干图片参考块 + 恰好一个"
             "（带标记的）音频参考块；当前类型 %s。" % sorted(kinds))
     rt = int(blk.get("ref_audio_t", 0))
     if rt <= 0:
@@ -132,7 +132,7 @@ def _move_audio_ref(layout, text_len, refs):
     count = int(sel.sum())
     if count < rt or count > 8 * rt:
         raise RuntimeError(
-            "h3_storydirector: 音频参考槽位里找到 %d 行，对应 %d 个 latent 步，"
+            "h3_scenedirector: 音频参考槽位里找到 %d 行，对应 %d 个 latent 步，"
             "预期在 %d..%d 之间。上游布局已变化，拒绝移动。"
             % (count, rt, rt, 8 * rt))
     # 窗口结束于 target_origin + FRAME_RESCALE * end_frame，宽度 rt 步
@@ -289,23 +289,23 @@ def apply_patch():
     if _applied:
         return True
     if not hasattr(mm, "PackedLayout") or not hasattr(mm, "FRAME_RESCALE"):
-        _LOG.warning("h3_storydirector: MiniMax H3 模型模块缺预期属性，补丁未应用")
+        _LOG.warning("h3_scenedirector: MiniMax H3 模型模块缺预期属性，补丁未应用")
         return False
     if getattr(mm.PackedLayout.__init__, "__name__", "") == "_patched_init":
         _applied = True
-        _LOG.info("h3_storydirector: 布局补丁已在位（另一份拷贝应用），认领养复用")
+        _LOG.info("h3_scenedirector: 布局补丁已在位（另一份拷贝应用），认领养复用")
         return True
     _orig_init = mm.PackedLayout.__init__
     try:
         _self_test()
     except Exception as exc:
         _orig_init = None
-        _LOG.warning("h3_storydirector: 自检失败（%s），补丁未应用。"
+        _LOG.warning("h3_scenedirector: 自检失败（%s），补丁未应用。"
                      "内部关键帧锚定不可用。", exc)
         return False
     mm.PackedLayout.__init__ = _patched_init
     _applied = True
-    _LOG.info("h3_storydirector: 内部关键帧锚定已启用")
+    _LOG.info("h3_scenedirector: 内部关键帧锚定已启用")
     return True
 
 

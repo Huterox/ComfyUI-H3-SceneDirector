@@ -1,4 +1,4 @@
-"""载荷共存补丁（StoryDirector 自研实现）。
+"""载荷共存补丁（SceneDirector 自研实现）。
 
 要解决的问题：ComfyUI 的 `MiniMaxH3.extra_conds` 用两个独立的 if 分支
 填充 DiT 载荷——关键帧分支写入 `cond_video_latents` 后，参考块分支会把
@@ -23,7 +23,7 @@ import logging
 
 import comfy.model_base as model_base
 
-_LOG = logging.getLogger("h3_storydirector")
+_LOG = logging.getLogger("h3_scenedirector")
 
 _orig_extra_conds = None
 _applied = False
@@ -40,7 +40,7 @@ def _patched_extra_conds(self, **kwargs):
     cond = out.get("minimax_payload", None)
     payload = getattr(cond, "cond", None) if cond is not None else None
     if not isinstance(payload, dict):
-        _LOG.warning("h3_storydirector: 够不到 H3 载荷，关键帧 latent 可能"
+        _LOG.warning("h3_scenedirector: 够不到 H3 载荷，关键帧 latent 可能"
                      "已被参考块覆盖")
         return out
 
@@ -66,17 +66,17 @@ def apply_patch():
         return True
     cls = getattr(model_base, "MiniMaxH3", None)
     if cls is None or not hasattr(cls, "extra_conds"):
-        _LOG.warning("h3_storydirector: 找不到 MiniMaxH3.extra_conds，"
+        _LOG.warning("h3_scenedirector: 找不到 MiniMaxH3.extra_conds，"
                      "关键帧与参考块无法共存")
         return False
     if getattr(cls.extra_conds, "__name__", "") == "_patched_extra_conds":
         _applied = True
-        _LOG.info("h3_storydirector: 载荷补丁已在位（另一份拷贝应用），认领养复用")
+        _LOG.info("h3_scenedirector: 载荷补丁已在位（另一份拷贝应用），认领养复用")
         return True
     _orig_extra_conds = cls.extra_conds
     cls.extra_conds = _patched_extra_conds
     _applied = True
-    _LOG.info("h3_storydirector: 关键帧/参考块共存已启用")
+    _LOG.info("h3_scenedirector: 关键帧/参考块共存已启用")
     return True
 
 
