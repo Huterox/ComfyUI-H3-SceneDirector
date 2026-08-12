@@ -341,7 +341,13 @@ async def status(request):
         if not isinstance(row, dict):
             row = {}
         m = cached[i] if i < len(cached) else None
-        ok = bool(m) and m.get("hash") == P.seg_hash(i, row) \
+        try:
+            row_hash = P.seg_hash(i, row)
+        except KeyError:
+            # 畸形行（缺 duration 等字段，比如旧前端缓存页的轮询）：
+            # 按未缓存处理，绝不让状态路由 500
+            row_hash = None
+        ok = bool(m) and row_hash is not None and m.get("hash") == row_hash \
             and os.path.isfile(C.latent_path(rd, i))
         if not ok and first_dirty is None:
             first_dirty = i
