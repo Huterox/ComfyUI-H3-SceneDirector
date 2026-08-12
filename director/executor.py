@@ -134,6 +134,18 @@ def _concat_audio(a, b):
 
 def encode_story(clip, vae, audio_vae, segments_raw, width, height,
                  first_frame=None):
+    """异常安全壳：编码报错时做显存收尾再原样抛出（不吞异常）。"""
+    try:
+        return _encode_story_impl(clip, vae, audio_vae, segments_raw,
+                                  width, height, first_frame=first_frame)
+    except Exception as e:
+        VRAM.cleanup_after_error()
+        emit_log("条件编码中断：%s（已释放显存）" % (e,))
+        raise
+
+
+def _encode_story_impl(clip, vae, audio_vae, segments_raw, width, height,
+                       first_frame=None):
     """编码头：把载荷里每一段的完整提示词（场景设定表 + 资产清单 +
     段提示词 + 段级资产钉）用接进来的 CLIP 编码，参考素材（图/视频/
     音频）用对应 VAE 编码，输出逐段 CONDITIONING 列表。链条只管消费。
@@ -290,12 +302,24 @@ def _sample(model, positive, latent, seed, sampler, sigmas, negative=None, cfg=1
 # 链条主循环
 # ---------------------------------------------------------------------------
 
-def run_chain(model, vae, audio_vae, segments_raw, story_cond, sampler, sigmas,
-              width, height, seed, context_length, audio_context_length,
-              encode_mode, anchor_mode, audio_mode, crop, cfg, cache_tag,
-              uniform_window=False, color_lock=False, negative=None,
-              continuity=True, seam_blend=True, vram_cleanup=False, node_id=None,
-              vram_budget=True, luma_lock=False):
+def run_chain(*args, **kwargs):
+    """异常安全壳：渲染报错时做显存收尾（gc + 归还 CUDA 缓存，保留模型
+    驻留现场），日志条可见，然后原样抛出——ComfyUI 需要错误状态。"""
+    try:
+        return _run_chain_impl(*args, **kwargs)
+    except Exception as e:
+        VRAM.cleanup_after_error()
+        emit_log("run 中断：%s（已释放显存）" % (e,))
+        raise
+
+
+def _run_chain_impl(model, vae, audio_vae, segments_raw, story_cond, sampler,
+                    sigmas, width, height, seed, context_length,
+                    audio_context_length,
+                    encode_mode, anchor_mode, audio_mode, crop, cfg, cache_tag,
+                    uniform_window=False, color_lock=False, negative=None,
+                    continuity=True, seam_blend=True, vram_cleanup=False,
+                    node_id=None, vram_budget=True, luma_lock=False):
     """链条主循环：缓存命中段直接解码，自第一个变动段起级联重渲；
     未勾选段（选择运行关闭）走缓存填充。返回 (images, audio, contact_sheet, info)。
 
