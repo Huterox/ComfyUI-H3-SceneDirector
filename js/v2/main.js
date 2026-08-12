@@ -1,6 +1,7 @@
-// main.js —— v2 前端入口：挂载、尺寸契约、骨架、工具条、输出条、模式切换。
+// main.js —— v3 前端入口：挂载、尺寸契约、骨架、工具条（模式 tabs + 项目栏）、
+// 输出条、模式切换。
 //
-// 嵌入方式与 Director 逐条对齐（js/AGENTS.md + 本文件头注）：
+// 嵌入方式与 v2 逐条对齐（js/AGENTS.md + 本文件头注）：
 //   * beforeRegisterNodeDef 包 onNodeCreated（先 orig），loadedGraphNode 兜底；
 //     node._h3sdEditor 幂等守卫；
 //   * 唯一 DOM widget：div.mmx-host，addDOMWidget 四点高度契约
@@ -8,12 +9,20 @@
 //   * ensureWidth 在 onDraw/afterResize/onResize/onSelected 四处同步
 //     （容器宽 = 节点宽 - 边距），内部全流体布局；
 //   * 隐藏原生 widget（纯赋值载体），DOM widget 沉底；
-//   * onRemoved 清理：WS 退订、定时器、元素移除。
+//   * onRemoved 清理：WS 退订、定时器、弹层/遮罩移除。
+//
+// v3 布局（自上而下）：工具条 → 实时预览 → 全局设置区（library.js：服务状态/
+// 全局提示词/资产库）→ 片段卡主区 → 输出条 → 胶片带 → 状态行 → 运行日志。
+// 项目栏：项目 = 服务端存档（user/SceneDirector/projects/），项目名即 run 名
+// （缓存目录名）；保存/另存为/删除走 /h3_scenedirector/project/* 路由。
 import { app } from "../../../scripts/app.js";
 import { api } from "../../../scripts/api.js";
 import { el, TASK_LABELS, taskKeyFromLabel, ASPECTS } from "./util.js";
 import { createStore } from "./store.js";
+import { createPromptBox } from "./promptbox.js";
 import { createCards } from "./cards.js";
+import { createLibrary } from "./library.js";
+import { createConfig } from "./config.js";
 import { createExtras } from "./extras.js";
 import { createEnhancer } from "./enhance.js";
 import { createVideoEditor } from "./video.js";
@@ -25,8 +34,7 @@ css.rel = "stylesheet";
 css.href = new URL("./skin.css", import.meta.url).href;
 document.head.appendChild(css);
 
-const MIN_W = 880;
-const BASE_H = 700;
+const BASE_H = 960;
 const REF_MODELS = {
     gen: "minimax_h3_fl2va_pruned_int8_convrot.safetensors",
     ref: "minimax_h3_ref2va_pruned_int8_convrot.safetensors",
@@ -82,6 +90,7 @@ function pushResolution(ed) {
         if (mpW) mpW.value = o.megapixels;
     } catch (e) { /* 联动失败不影响编辑 */ }
 }
+
 // 两个模型位由输出条的「模型联动」下拉配置，随工作流保存（output.modelGen/modelRef）。
 function linkModel(node, modeKey, store) {
     try {
@@ -110,10 +119,30 @@ function linkModel(node, modeKey, store) {
     } catch (e) { /* 联动失败不影响编辑 */ }
 }
 
+// UNETLoader 的可选模型清单（输出条模型联动的候选）
+function modelChoices() {
+    try {
+        const nodes = app.graph?._nodes || [];
+        const byId = (id) => nodes.find((n) => String(n.id) === String(id));
+        const chain = nodes.find((n) => n.comfyClass === "H3SceneDirectorChain");
+        let src = chain?.inputs?.[0]?.link != null
+            ? byId(app.graph.links[chain.inputs[0].link]?.origin_id) : null;
+        let hops = 0;
+        while (src && src.type !== "UNETLoader" && hops < 4) {
+            const inp = src.inputs?.find((i) => i.link != null && /MODEL/i.test(i.type || ""));
+            if (!inp) break;
+            src = byId(app.graph.links[inp.link]?.origin_id);
+            hops += 1;
+        }
+        const vals = src?.widgets?.find((w) => w.name === "unet_name")?.options?.values;
+        return Array.isArray(vals) && vals.length ? vals : null;
+    } catch (e) { return null; }
+}
+
 function buildSkeleton(ed) {
     const root = el("div", "sd2");
 
-    // 工具条
+    // --- 工具条：模式 tabs + 项目栏 -------------------------------------------
     const bar = el("div", "sd2-bar");
     bar.appendChild(el("span", "sd2-logo", "SceneDirector"));
     const tabs = el("div", "sd2-tabs");
@@ -131,20 +160,35 @@ function buildSkeleton(ed) {
         tabs.appendChild(b);
     }
     bar.appendChild(tabs);
-    bar.appendChild(el("span", "lbl", "场景"));
-    const runInput = el("input", "sd2-run");
-    runInput.type = "text";
-    runInput.title = "run 名 = 缓存目录名（output/h3_scenedirector/<run>/）；换名即开新场景";
-    runInput.value = ed.store.resolveRun();
-    runInput.addEventListener("input", () => {
-        const w = ed.store.runWidget();
-        if (w) w.value = runInput.value;
-        ed.store.commit();
-    });
-    bar.appendChild(runInput);
+
+    // 项目栏：下拉（载入）+ 保存 + 另存为 + 删除
+    bar.appendChild(el("span", "lbl", "项目"));
+    const projSel = el("select", "sd2-inp sd2-proj");
+    projSel.title = "项目库：一个项目 = 一个场景（分段/资产库/输出设置全量存档），"
+        + "项目名即 run 名（缓存目录名）";
+    bar.appendChild(projSel);
+    const saveBtn = el("button", "sd2-btn", "保存");
+    saveBtn.title = "把当前工作台全量状态存到项目库（同名覆盖）";
+    const saveAsBtn = el("button", "sd2-btn", "另存为");
+    saveAsBtn.title = "换个名字存成新项目（当前场景随之改名）";
+    const delProjBtn = el("button", "sd2-btn sm danger", "删");
+    delProjBtn.title = "从项目库删除当前项目（缓存目录不动）";
+    bar.appendChild(saveBtn);
+    bar.appendChild(saveAsBtn);
+    bar.appendChild(delProjBtn);
+
     const sum = el("span", "sd2-sum");
     bar.appendChild(sum);
     bar.appendChild(el("span", "sp"));
+    const aiBtn = el("button", "sd2-btn ai", "✨ AI 自动创作");
+    aiBtn.title = "从一句话想法到整条分镜：agent 自动规划/生图/写提示词（接入中）";
+    aiBtn.addEventListener("click", () => {
+        // P6 里程碑接入自动创作抽屉；先给个不打扰的反馈
+        const old = aiBtn.textContent;
+        aiBtn.textContent = "✨ 接入中…";
+        setTimeout(() => { aiBtn.textContent = old; }, 1200);
+    });
+    bar.appendChild(aiBtn);
     const addBtn = el("button", "sd2-btn primary", "+ 分镜");
     addBtn.addEventListener("click", () => {
         const s = ed.store.get();
@@ -176,12 +220,98 @@ function buildSkeleton(ed) {
 
     const live = el("div", "sd2-live hidden");
     root.appendChild(live);
-    const main = el("div", "sd2-main");
-    root.appendChild(main);
     const globalArea = el("div", "sd2-global");
     root.appendChild(globalArea);
+    const main = el("div", "sd2-main");
+    root.appendChild(main);
 
-    // 输出条
+    // --- 项目栏逻辑 -------------------------------------------------------------
+    const CUR = "__current__";   // 下拉里"未入库的当前场景"占位值
+    async function refreshProjects() {
+        let list = [];
+        try {
+            const r = await api.fetchApi("/h3_scenedirector/projects");
+            if (r.ok) list = (await r.json()).projects || [];
+        } catch (e) { /* 后端忙：保持现状 */ }
+        const run = ed.store.resolveRun();
+        projSel.innerHTML = "";
+        const names = list.map((p) => p.name);
+        if (!names.includes(run)) {
+            projSel.appendChild(new Option("（未保存）" + run, CUR));
+        }
+        for (const p of list) projSel.appendChild(new Option(p.name, p.name));
+        projSel.value = names.includes(run) ? run : CUR;
+    }
+    async function saveProject(saveAs) {
+        let name = ed.store.resolveRun();
+        if (saveAs) {
+            const n = window.prompt("另存为项目名：", name);
+            if (!n || !n.trim()) return;
+            name = n.trim();
+            const w = ed.store.runWidget();
+            if (w) w.value = name;
+            ed.store.commit();
+        }
+        const btn = saveAs ? saveAsBtn : saveBtn;
+        const old = btn.textContent;
+        btn.disabled = true;
+        try {
+            const r = await api.fetchApi("/h3_scenedirector/project/save", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name, state: ed.store.projectState() }),
+            });
+            if (!r.ok) throw new Error("HTTP " + r.status);
+            btn.textContent = "已保存 ✓";
+            await refreshProjects();
+        } catch (e) {
+            btn.textContent = "保存失败 ✗";
+            console.error("[sd2] 项目保存失败", e);
+        } finally {
+            btn.disabled = false;
+            setTimeout(() => { btn.textContent = old; }, 1400);
+        }
+    }
+    async function loadProject(name) {
+        try {
+            const r = await api.fetchApi("/h3_scenedirector/project/load", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name }),
+            });
+            const doc = await r.json();
+            if (!r.ok) throw new Error(doc.error || ("HTTP " + r.status));
+            if (ed.store.applyProject(doc.state)) {   // reload → structural 重绘
+                linkModel(ed.node, ed.store.mode(), ed.store);
+                pushResolution(ed);
+                ed.selectedIndex = 0;
+            }
+        } catch (e) {
+            console.error("[sd2] 项目载入失败", e);
+            await refreshProjects();   // 回弹选择
+        }
+    }
+    saveBtn.addEventListener("click", () => saveProject(false));
+    saveAsBtn.addEventListener("click", () => saveProject(true));
+    delProjBtn.addEventListener("click", async () => {
+        const name = ed.store.resolveRun();
+        if (!window.confirm("从项目库删除「" + name + "」？（缓存目录与当前编辑不受影响）")) return;
+        try {
+            await api.fetchApi("/h3_scenedirector/project/delete", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name }),
+            });
+        } catch (e) { /* 忽略 */ }
+        await refreshProjects();
+    });
+    projSel.addEventListener("change", () => {
+        const v = projSel.value;
+        if (v && v !== CUR && v !== ed.store.resolveRun()) loadProject(v);
+        else refreshProjects();
+    });
+
+    // --- 输出条 ------------------------------------------------------------------
     const out = el("div", "sd2-out");
     const o = () => ed.store.get().output;
     out.appendChild(el("span", "lbl", "宽高比"));
@@ -253,6 +383,27 @@ function buildSkeleton(ed) {
     au.value = o().audioMode;
     au.addEventListener("change", () => { o().audioMode = au.value; ed.store.commit(); });
     out.appendChild(au);
+    // 模型联动（v3 从增强器面板挪到输出条；切模式自动换 UNETLoader）
+    const opts = modelChoices();
+    const modelSel = (label, field, fallback) => {
+        const sel = el("select", "sd2-inp model");
+        for (const v of (opts || [fallback])) {
+            sel.appendChild(new Option(v.replace(/^minimax_h3_|\.safetensors$/g, ""), v));
+        }
+        const cur = o()[field] || fallback;
+        if (![...sel.options].some((x) => x.value === cur)) sel.appendChild(new Option(cur, cur));
+        sel.value = cur;
+        sel.title = "切模式时自动换 UNETLoader 的模型（此处只是选文件，切换是自动的）";
+        sel.addEventListener("change", () => {
+            o()[field] = sel.value;
+            ed.store.commit();
+            ed.linkModel?.(ed.store.mode());
+        });
+        return sel;
+    };
+    out.appendChild(el("span", "lbl", "模型"));
+    out.appendChild(modelSel("生成系", "modelGen", REF_MODELS.gen));
+    out.appendChild(modelSel("参考系", "modelRef", REF_MODELS.ref));
     out.appendChild(el("span", "sp"));
     const liveBtn = el("button", "sd2-btn", "实时预览：开");
     liveBtn.addEventListener("click", () => {
@@ -272,8 +423,9 @@ function buildSkeleton(ed) {
     out.appendChild(exp);
     root.appendChild(out);
 
-    return { root, bar, tabs, runInput, sum, addBtn, rerollBtn, selBtn,
-             live, main, globalArea, out, asp, mp, fps, cont, ctxN, au, exp };
+    return { root, bar, tabs, projSel, saveBtn, saveAsBtn, delProjBtn, aiBtn, sum,
+             addBtn, rerollBtn, selBtn, live, globalArea, main, out, asp, mp, fps,
+             cont, ctxN, au, exp, refreshProjects };
 }
 
 function initEditor(node) {
@@ -285,7 +437,7 @@ function initEditor(node) {
     const ed = {
         node, store, container,
         selectedIndex: 0,
-        preview: null,     // {text, target: 段号|"global"|"shot:N", name}
+        preview: null,     // {text, target: 段号|"global"|"shot:N", name, error?}
         liveOn: true,
         statuses: null,    // 最近一次 /status 响应
     };
@@ -294,12 +446,16 @@ function initEditor(node) {
     ed.els = buildSkeleton(ed);
     container.appendChild(ed.els.root);
 
+    ed.promptbox = createPromptBox(ed, { api });
+    ed.library = createLibrary(ed, { api });
+    ed.els.globalArea.appendChild(ed.library.element);
+    ed.config = createConfig(ed, { api });
     ed.cards = createCards(ed, { api });
     ed.extras = createExtras(ed, { api });
     ed.els.root.appendChild(ed.extras.element);    // 胶片带：输出条之后
     ed.els.root.appendChild(ed.extras.statusEl);   // 状态行
     ed.enhancer = createEnhancer(ed, { api });
-    ed.els.root.appendChild(ed.enhancer.element);
+    ed.els.root.appendChild(ed.enhancer.element);  // v3 起为隐藏占位（配置在服务端）
     ed.videoEditor = createVideoEditor(ed, { api });
     ed.logs = createLogs(ed, { api });
     ed.els.root.appendChild(ed.logs.element);      // 运行日志条：沉底
@@ -321,8 +477,9 @@ function initEditor(node) {
         ed.els.selBtn.classList.toggle("active", !!s.runSelectEnabled);
         ed.selectedIndex = Math.max(0, Math.min(ed.selectedIndex, segs.length - 1));
 
-        // 主区 + 全局区按模式
-        ed.cards.render(ed.els.main, ed.els.globalArea);
+        // 全局设置区（资产库）+ 主区
+        ed.library.render();
+        ed.cards.render(ed.els.main);
         ed.extras.render();
         app.graph?.setDirtyCanvas?.(true, true);
     };
@@ -340,6 +497,7 @@ function initEditor(node) {
             if (!store.isWriting()) {
                 store.reload();
                 ed.render();
+                ed.els.refreshProjects();
             }
             return out;
         };
@@ -348,12 +506,20 @@ function initEditor(node) {
     linkModel(node, store.mode(), store);
     ed.linkModel = (key) => linkModel(node, key, store);
     pushResolution(ed);   // 加载即把输出条的比例/像素推到图里的 ResolutionSelector
+    // 旧存档迁移落盘一次：tl JSON 还没有 library 键时轻量 commit，
+    // 让后续所有消费者（后端/状态查询）都拿到 v4.1 结构
+    try {
+        const raw = JSON.parse(store.tlWidget()?.value || "{}");
+        if (!Array.isArray(raw.library)) store.commit();
+    } catch (e) { /* 解析失败不挡加载 */ }
     ed.render();
+    ed.els.refreshProjects();
+    ed.library.refreshConfig();
     ed.extras.start();
     return ed;
 }
 
-// --- 挂载（Director 对齐） ---------------------------------------------------
+// --- 挂载（v2 对齐） -----------------------------------------------------------
 
 function hideWidget(w) {
     if (!w) return;
@@ -416,6 +582,10 @@ app.registerExtension({
         nodeType.prototype.onRemoved = function () {
             try { this._h3sdEditor?.extras?.dispose?.(); } catch (e) { /* 忽略 */ }
             try { this._h3sdEditor?.logs?.dispose?.(); } catch (e) { /* 忽略 */ }
+            try { this._h3sdEditor?.config?.dispose?.(); } catch (e) { /* 忽略 */ }
+            try {
+                document.querySelectorAll(".sd2-refpick, .sd2-asset-edit").forEach((p) => p.remove());
+            } catch (e) { /* 忽略 */ }
             return origRemoved?.apply(this, arguments);
         };
     },
@@ -436,6 +606,7 @@ app.registerExtension({
                 if (ed) {
                     ed.store.reload();
                     ed.render();
+                    ed.els.refreshProjects();
                 }
                 ensureWidth(node);
             } catch (e) {

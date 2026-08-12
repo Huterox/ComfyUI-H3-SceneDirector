@@ -76,7 +76,8 @@ class H3SceneDirectorList:
         if not segs:
             # UI 还没写时间线时给一段空白 t2v，避免空载荷报错
             segs = [{"duration": max(1.0, round(total_frames / max(1.0, frame_rate), 2)),
-                     "prompt": "", "nonce": "", "assets": [], "enabled": True,
+                     "prompt": "", "nonce": "", "refs": [], "assets": [],
+                     "enabled": True,
                      "first_frame": None, "last_frame": None, "source": None,
                      "audio_mode": "generate", "task": P._task_key_from_label(task_type)}]
         payload = {"run": P.sanitize_run(run_name), "run_nonce": 0,

@@ -3,7 +3,9 @@
 // 组成（设计图 v2v.png）：
 //   上传区（点击/拖拽，>95MB 自动分块）→ 舞台播放器（播放/seek/帧跳转/循环）
 //   → 时间轴段块（点选/拖右缘调区间/分割点删除合并相邻段）
-//   → 段面板（提示词+🪄+rv2v 段级参考图/音频）+ 智能分割/均分/追加视频。
+//   → 段面板（提示词+🪄+rv2v 段级引用 chips）+ 智能分割/均分/追加视频。
+// v3：全局参考图/音频/视频统一进资产库（library.js 全局设置区），段级参考
+// 统一走 libRefs 引用 chips（@ 引用即挂载），本文件不再维护独立槽位。
 //
 // 数据契约（后端 parse_director）：
 //   * 单视频：tl.video.fileName + 段 start/length（24fps 时间轴帧号）
@@ -11,7 +13,8 @@
 //     段与 clip 1:1（后端 clip = clips[min(i, len-1)]），追加视频后
 //     不能再智能分割/均分（后端只看 clip 整段范围）；
 //   * 段的 frameCount = length、durationSec = length/24（输出时长跟随源区间）。
-import { el, fmtTime, viewURL, splitRel, uploadImage, refThumbURL, lightbox } from "./util.js";
+import { el, fmtTime, viewURL, uploadImage, assetKey } from "./util.js";
+import { segRefChips } from "./library.js";
 
 const TL_FPS = 24;   // 时间轴帧率（parse_director 用 tl.frameRate=24 换算秒）
 
@@ -64,6 +67,7 @@ export function createVideoEditor(ed, { api }) {
             id: store.newSegment().id, start: 0, length: frames,
             frameCount: frames, durationSec: Math.round(frames / TL_FPS * 10) / 10,
             prompt: "", taskType: store.mode(), refs: [], refAudios: [], refVideos: [],
+            libRefs: [],
             genImage: { imageFile: "" },
         }];
         s.shots = [];
@@ -95,6 +99,7 @@ export function createVideoEditor(ed, { api }) {
             id: store.newSegment().id, start: base, length: base + frames,
             frameCount: frames, durationSec: Math.round(frames / TL_FPS * 10) / 10,
             prompt: "", taskType: store.mode(), refs: [], refAudios: [], refVideos: [],
+            libRefs: [],
             genImage: { imageFile: "" },
         });
         s.video.frames = base + frames;
@@ -140,7 +145,8 @@ export function createVideoEditor(ed, { api }) {
                 start: cuts[i], length: len,
                 frameCount: len, durationSec: Math.round(len / TL_FPS * 10) / 10,
                 prompt: prompts[i] || "", taskType: store.mode(),
-                refs: [], refAudios: [], refVideos: [], genImage: { imageFile: "" },
+                refs: [], refAudios: [], refVideos: [], libRefs: [],
+                genImage: { imageFile: "" },
             });
         }
         if (segs.length) {
@@ -161,7 +167,7 @@ export function createVideoEditor(ed, { api }) {
 
     // --- 渲染 -------------------------------------------------------------------
 
-    function render(main, globalArea) {
+    function render(main) {
         const s = store.get();
         main.innerHTML = "";
 
@@ -185,7 +191,6 @@ export function createVideoEditor(ed, { api }) {
         main.appendChild(buildStage());
         main.appendChild(buildTrack());
         main.appendChild(buildSegPanel());
-        if (store.mode() === "rv2v") globalArea.appendChild(buildRv2vGlobal());
     }
 
     function pickFile(onFile) {
@@ -354,7 +359,7 @@ export function createVideoEditor(ed, { api }) {
         return wrap;
     }
 
-    // 段面板（选中段：提示词 + 🪄 + 删除 + rv2v 段级参考）
+    // 段面板（选中段：提示词 + 🪄 + 删除 + 引用 chips）
     function buildSegPanel() {
         const s = store.get();
         const i = Math.min(ed.selectedIndex, s.segments.length - 1);
@@ -393,156 +398,40 @@ export function createVideoEditor(ed, { api }) {
         head.appendChild(del);
         panel.appendChild(head);
 
-        // 提示词 + 🪄（复用 cards.js 的 promptArea 结构，直接内联实现避免循环依赖）
-        const phead = el("div", "sd2-phead");
-        phead.appendChild(el("span", "lbl", "片段提示词"));
-        const wand = el("button", "sd2-wand", "🪄 扩写本段");
-        wand.type = "button";
-        wand.addEventListener("click", () => ed.enhancer.enhanceTarget(i));
-        phead.appendChild(wand);
-        panel.appendChild(phead);
-        const ta = el("textarea", "sd2-prompt");
-        ta.value = seg.prompt || "";
-        ta.placeholder = "这一段要改成什么（画面/运镜/声音）……";
-        ta.addEventListener("input", () => { seg.prompt = ta.value; store.commit(); });
-        panel.appendChild(ta);
-        if (ed.preview && ed.preview.target === i) {
-            // 预览块（与 cards.js 同结构）
-            const p = ed.preview;
-            const box = el("div", "sd2-pv");
-            box.appendChild(el("div", "hd", "🪄 结果预览 · " + p.name + " · 确认后应用"));
-            box.appendChild(el("pre", "tx", p.text));
-            const ops = el("div", "ops");
-            const close = () => { ed.preview = null; ed.render(); };
-            const mk = (label, cls, fn) => {
-                const b = el("button", cls, label);
-                b.type = "button";
-                b.addEventListener("click", (e) => { e.preventDefault(); fn(); });
-                ops.appendChild(b);
-            };
-            mk("应用", "p", () => { ed.enhancer.applyPreview(); });
-            mk("复制", "s", () => { navigator.clipboard?.writeText(p.text); });
-            mk("丢弃", "d", close);
-            box.appendChild(ops);
-            panel.appendChild(box);
-        }
-
-        // rv2v：段级参考图/音频
-        if (store.mode() === "rv2v") {
-            panel.appendChild(el("div", "sd2-sec", "本段参考图（编号接全局之后）"));
-            const gPics = (s.global.refs || []).length;
-            const refs = el("div", "sd2-refs");
-            for (let k = 0; k < Math.max(1, 4 - 0); k++) {
-                refs.appendChild(segRefSlot(seg.refs, gPics + k));
-            }
-            panel.appendChild(refs);
-            panel.appendChild(el("div", "sd2-sec", "本段参考音频"));
-            const auds = el("div", "sd2-refs three");
-            for (let k = 0; k < 3; k++) auds.appendChild(segAudioSlot(seg.refAudios, k));
-            panel.appendChild(auds);
-        }
+        // 提示词 + 🪄（共享 promptbox；rv2v 段开 @ 引用挂载）
+        const chipsRef = segRefChips(ed, { api }, seg);
+        panel.appendChild(ed.promptbox.promptArea(
+            () => seg.prompt,
+            (v) => { seg.prompt = v; store.commit(); },
+            { wandTarget: i,
+              mentionScope: () => mentionItems(),
+              onPick: (item) => {
+                  if (item.pinned) return;
+                  seg.libRefs = Array.isArray(seg.libRefs) ? seg.libRefs : [];
+                  if (!seg.libRefs.includes(item.key)) {
+                      seg.libRefs.push(item.key);
+                      store.commit();
+                      chipsRef.update();
+                  }
+              } },
+        ));
+        const pv = ed.promptbox.previewBlock(i);
+        if (pv) panel.appendChild(pv);
+        panel.appendChild(chipsRef.element);
         return panel;
     }
 
-    function segRefSlot(refList, index) {
-        const ref = refList.find((r) => Number(r.index) === index && r.imageFile);
-        const slot = el("div", "sd2-ref" + (ref ? " has" : ""));
-        let clickTimer = 0;
-        if (ref) {
-            const img = document.createElement("img");
-            img.src = refThumbURL(api, ref);
-            slot.appendChild(img);
-            slot.appendChild(el("span", "tag", "图片" + (index + 1)));
-            const x = el("u", "x", "×");
-            x.addEventListener("click", (e) => {
-                e.stopPropagation();
-                clearTimeout(clickTimer);
-                refList.splice(refList.indexOf(ref), 1);
-                store.commit({ structural: true });
-            });
-            slot.appendChild(x);
-            slot.title = "点击更换；双击放大";
-        } else {
-            slot.textContent = "图片" + (index + 1);
-        }
-        slot.addEventListener("click", () => {
-            clearTimeout(clickTimer);
-            clickTimer = setTimeout(() => {
-                const inp = document.createElement("input");
-                inp.type = "file";
-                inp.accept = "image/*";
-                inp.style.display = "none";
-                inp.addEventListener("change", async () => {
-                    const f = inp.files && inp.files[0];
-                    inp.remove();
-                    if (!f) return;
-                    const info = await uploadImage(api, f);
-                    const rel = info.subfolder ? info.subfolder + "/" + info.name : info.name;
-                    const old = refList.find((r) => Number(r.index) === index);
-                    if (old) old.imageFile = rel;
-                    else refList.push({ index, imageFile: rel });
-                    store.commit({ structural: true });
-                });
-                document.body.appendChild(inp);
-                inp.click();
-            }, 260);
-        });
-        if (ref) {
-            slot.addEventListener("dblclick", () => {
-                clearTimeout(clickTimer);
-                lightbox(refThumbURL(api, ref), false);
-            });
-        }
-        return slot;
-    }
-
-    function segAudioSlot(refList, index) {
-        const ref = refList.find((r) => Number(r.index) === index && r.audioFile);
-        const slot = el("div", "sd2-audio" + (ref ? " has" : ""));
-        slot.textContent = ref ? "音频" + (index + 1) + " · " + splitRel(ref.audioFile).image : "音频" + (index + 1);
-        if (ref) {
-            const x = el("u", "x", "×");
-            x.addEventListener("click", (e) => {
-                e.stopPropagation();
-                refList.splice(refList.indexOf(ref), 1);
-                store.commit({ structural: true });
-            });
-            slot.appendChild(x);
-        }
-        slot.addEventListener("click", () => {
-            const inp = document.createElement("input");
-            inp.type = "file";
-            inp.accept = "audio/*";
-            inp.style.display = "none";
-            inp.addEventListener("change", async () => {
-                const f = inp.files && inp.files[0];
-                inp.remove();
-                if (!f) return;
-                const info = await uploadImage(api, f);
-                const rel = info.subfolder ? info.subfolder + "/" + info.name : info.name;
-                const old = refList.find((r) => Number(r.index) === index);
-                if (old) old.audioFile = rel;
-                else refList.push({ index, audioFile: rel });
-                store.commit({ structural: true });
-            });
-            document.body.appendChild(inp);
-            inp.click();
-        });
-        return slot;
-    }
-
-    // rv2v 全局参考图（复用全局面板语义：仅图片区）
-    function buildRv2vGlobal() {
+    // @ 引用候选（v2v/rv2v 段：列资产库全量卡，常驻标 📌）
+    function mentionItems() {
         const s = store.get();
-        const panel = el("div", "sd2-panel");
-        const head = el("div", "sd2-card-head");
-        head.appendChild(el("b", "", "全局参考图（图片1–9）"));
-        head.appendChild(el("span", "meta", "供各段读取"));
-        panel.appendChild(head);
-        const refs = el("div", "sd2-refs nine");
-        for (let k = 0; k < 9; k++) refs.appendChild(segRefSlot(s.global.refs, k));
-        panel.appendChild(refs);
-        return panel;
+        const lib = s.library || [];
+        return lib.map((c) => {
+            const key = assetKey(c);
+            const pinned = c.pinned !== false;
+            return { key, pinned,
+                     label: (pinned ? "📌" : "○") + " " + key,
+                     insert: c.name };   // v2v 段不编锚点号（源片为主），插入卡名即可
+        }).filter(Boolean);
     }
 
     return { render };

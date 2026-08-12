@@ -204,6 +204,85 @@ def test_schema_version():
     assert P.SCHEMA == 5
 
 
+# ---------------------------------------------------------------------------
+# parse_director：资产库（timeline v4.1 library/libRefs）
+# ---------------------------------------------------------------------------
+
+def test_parse_director_library():
+    """library 非空 -> 以它为准（pinned 保留）；段 libRefs -> 载荷 refs；
+    旧键（global.refs / 段内联 refs）被忽略。"""
+    tl = {
+        "global": {"prompt": "武侠", "taskType": "r2v — 参考主体生视频(Reference to Video)",
+                   "refs": [{"index": 0, "imageFile": "legacy.png"}]},
+        "library": [
+            {"category": "角色", "name": "青霜", "imageFile": "q.png",
+             "note": "青衫", "kind": "image", "pinned": True},
+            {"category": "道具", "name": "竹剑", "imageFile": "sw.png",
+             "kind": "image", "pinned": False},
+            {"category": "音乐", "name": "鼓点", "imageFile": "sub/d.mp3",
+             "kind": "audio", "pinned": True},
+        ],
+        "segments": [
+            {"id": "s1", "durationSec": 5, "prompt": "出剑",
+             "libRefs": ["道具·竹剑"],
+             "refs": [{"index": 9, "imageFile": "legacy_seg.png"}]},
+            {"id": "s2", "durationSec": 5, "prompt": "收剑", "libRefs": []},
+        ],
+    }
+    gp, assets, segs, _ = P.parse_director(json.dumps(tl), "", "", "竹林")
+    assert gp == "武侠"
+    assert [(a["category"], a["name"], a["kind"], a["pinned"]) for a in assets] == [
+        ("角色", "青霜", "image", True),
+        ("道具", "竹剑", "image", False),
+        ("音乐", "鼓点", "audio", True)]
+    assert assets[2]["subfolder"] == "sub" and assets[2]["image"] == "d.mp3"
+    assert segs[0]["refs"] == ["道具·竹剑"]
+    assert segs[0]["assets"] == []                # 旧内联键被忽略
+    assert segs[0]["task"] == "r2v"
+    assert segs[1]["refs"] == []
+    # 载荷全链路：refs 解析出生效资产（常驻 + 引用）
+    run, nonce, gp2, grows, lib, psegs = P.parse_payload(json.dumps({
+        "run": "x", "assets": assets,
+        "segments": [{"duration": 5, "prompt": "出剑", "refs": segs[0]["refs"]}],
+    }))
+    eff = P.seg_effective_assets(lib, psegs[0])
+    assert [a["name"] for a in eff] == ["青霜", "鼓点", "竹剑"]
+
+
+def test_parse_director_legacy_fallback():
+    """无 library -> 旧行为：global.refs 常驻、段内联卡进 assets。"""
+    tl = {
+        "global": {"prompt": "", "refs": [{"index": 0, "imageFile": "g.png"}]},
+        "segments": [{"id": "s1", "durationSec": 5, "prompt": "x",
+                      "refs": [{"index": 1, "imageFile": "s.png"}]}],
+    }
+    gp, assets, segs, _ = P.parse_director(json.dumps(tl), "", "", "r")
+    assert [a["name"] for a in assets] == ["g"]
+    assert assets[0]["pinned"] is True
+    assert [a["name"] for a in segs[0]["assets"]] == ["s"]
+    assert segs[0]["refs"] == []
+    # 空 library（全删光了）也走旧路
+    tl["library"] = []
+    gp, assets, segs, _ = P.parse_director(json.dumps(tl), "", "", "r")
+    assert [a["name"] for a in assets] == ["g"]
+
+
+def test_parse_director_shots_librefs():
+    """fl2v shots 的 libRefs 同样进载荷 refs。"""
+    tl = {
+        "global": {"prompt": "", "taskType": "fl2v — 首尾帧生视频(First-Last Frame)"},
+        "library": [{"category": "角色", "name": "甲", "imageFile": "a.png",
+                     "kind": "image", "pinned": True}],
+        "shots": [{"id": "sh1", "durationSec": 5, "prompt": "p",
+                   "startImage": {"imageFile": "f.png"},
+                   "libRefs": ["角色·甲"]}],
+    }
+    gp, assets, segs, _ = P.parse_director(json.dumps(tl), "", "", "r")
+    assert segs[0]["task"] == "fl2v"
+    assert segs[0]["refs"] == ["角色·甲"]
+    assert segs[0]["first_frame"] == {"image": "f.png", "subfolder": ""}
+
+
 ALL = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
 
 if __name__ == "__main__":

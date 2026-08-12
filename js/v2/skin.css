@@ -282,8 +282,8 @@
 .mmx-host .sd2-pe-model { display: inline-flex; align-items: center; gap: 4px; }
 .mmx-host .sd2-pe-model .sd2-inp { max-width: 170px; }
 
-/* 全局面板强制可见：保底一排可用高度，再也不被折叠没 */
-.mmx-host .sd2-global { flex: 0 1 auto; min-height: 148px; max-height: 55%; overflow-y: auto; }
+/* 全局面板强制可见：保底可用高度（v3 资产库要露出一排卡），再也不被折叠没 */
+.mmx-host .sd2-global { flex: 0 1 auto; min-height: 218px; max-height: 58%; overflow-y: auto; }
 
 /* ---------- 运行日志条 ---------- */
 .mmx-host .sd2-log { flex: none; background: var(--panel); border: 1px solid var(--line);
@@ -303,3 +303,148 @@
 .mmx-host .sd2-wand.busy { cursor: wait; border-color: var(--accent);
     animation: sd2-wand-pulse 1s ease-in-out infinite; }
 @keyframes sd2-wand-pulse { 0%, 100% { opacity: .45; } 50% { opacity: 1; } }
+
+/* ================= v3：项目栏 / 全局设置区（资产库）/ 配置弹窗 ================= */
+
+/* 工具条项目栏 */
+.mmx-host .sd2-proj { max-width: 170px; }
+.mmx-host .sd2-btn.ai { background: linear-gradient(135deg, #43307a, #2e6fd8);
+    border-color: #5a4a9d; color: #e6dcff; }
+.mmx-host .sd2-btn.ai:hover { background: linear-gradient(135deg, #4e3a8c, #3b7fe8); }
+
+/* 全局设置区外壳（挂在 .sd2-global 容器里） */
+.mmx-host .sd2-lib { display: flex; flex-direction: column; gap: 8px;
+    background: linear-gradient(180deg, #1c2230, #161a24);
+    border: 1px solid var(--line2); border-radius: 8px; padding: 8px 10px; }
+.mmx-host .sd2-lib-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.mmx-host .sd2-lib-head b { color: #9fb2d8; }
+.mmx-host .sd2-lib-head .svc { color: var(--dim); }
+.mmx-host .sd2-lib-gp .sd2-prompt { min-height: 44px; }
+.mmx-host .sd2-lib-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    border-top: 1px solid var(--line); padding-top: 7px; }
+.mmx-host .sd2-lib-bar b { color: #9fb2d8; }
+.mmx-host .sd2-lib-tabs { display: flex; gap: 2px; flex-wrap: wrap; }
+.mmx-host .sd2-lib-tabs button { background: #232733; color: var(--dim); border: none;
+    border-radius: 4px; padding: 3px 10px; font-size: 11px; }
+.mmx-host .sd2-lib-tabs button:hover { background: #2b3040; color: var(--text); }
+.mmx-host .sd2-lib-tabs button.on { background: var(--accent2); color: #fff; }
+
+/* 资产卡网格 */
+.mmx-host .sd2-lib-grid { display: grid; gap: 8px;
+    grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); }
+.mmx-host .sd2-asset { background: var(--screen); border: 1px solid var(--line);
+    border-radius: 8px; overflow: hidden; display: flex; flex-direction: column;
+    position: relative; }
+.mmx-host .sd2-asset.pinned { border-color: #2f4a5f; }
+.mmx-host .sd2-asset-thumb { height: 96px; background: #000; display: flex;
+    align-items: center; justify-content: center; overflow: hidden; }
+.mmx-host .sd2-asset-thumb img, .mmx-host .sd2-asset-thumb video {
+    width: 100%; height: 100%; object-fit: contain; }
+.mmx-host .sd2-asset-thumb .ico { font-size: 30px; color: var(--dimmer); }
+.mmx-host .sd2-asset-name { display: flex; align-items: center; gap: 6px;
+    padding: 5px 8px 0; }
+.mmx-host .sd2-asset-name b { color: var(--text); font-size: 12px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mmx-host .sd2-asset-name .cat { flex: none; font-size: 9px; color: var(--live);
+    background: #1e3a5c; border-radius: 3px; padding: 0 5px; }
+.mmx-host .sd2-asset-note { color: var(--dim); font-size: 10px; padding: 2px 8px 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mmx-host .sd2-asset-acts { display: flex; align-items: center; gap: 6px;
+    padding: 5px 8px 7px; }
+.mmx-host .sd2-asset-acts button { background: #232733; color: var(--dim);
+    border: 1px solid var(--line2); border-radius: 4px; padding: 1px 7px; font-size: 10px; }
+.mmx-host .sd2-asset-acts button:hover { background: #2b3040; color: var(--text); }
+.mmx-host .sd2-asset-acts .pin.on { background: var(--ok-bg); color: var(--ok);
+    border-color: #2e5a46; }
+.mmx-host .sd2-asset-refs { margin-left: auto; font-size: 9px; color: var(--warn);
+    background: var(--warn-bg); border-radius: 3px; padding: 1px 5px; }
+.mmx-host .sd2-asset.add { align-items: center; justify-content: center; min-height: 150px;
+    border-style: dashed; cursor: pointer; color: var(--dimmer); gap: 4px; }
+.mmx-host .sd2-asset.add span { font-size: 24px; }
+.mmx-host .sd2-asset.add em { font-style: normal; font-size: 11px; }
+.mmx-host .sd2-asset.add:hover, .mmx-host .sd2-asset.add.drop {
+    border-color: var(--accent); color: var(--dim); }
+
+/* 段级引用 chips */
+.mmx-host .sd2-chips { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.mmx-host .sd2-chip { display: inline-flex; align-items: center; gap: 4px;
+    background: #1e3a5c; border: 1px solid #2f4a5f; border-radius: 10px;
+    padding: 1px 6px 1px 2px; font-size: 10px; color: #b8d4ea; }
+.mmx-host .sd2-chip img { width: 18px; height: 18px; border-radius: 50%;
+    object-fit: cover; background: #000; }
+.mmx-host .sd2-chip i { font-style: normal; }
+.mmx-host .sd2-chip b { font-weight: 500; }
+.mmx-host .sd2-chip u { text-decoration: none; color: var(--live); font-size: 9px;
+    opacity: .8; }
+.mmx-host .sd2-chip .x { color: var(--bad); cursor: pointer; font-style: normal;
+    font-size: 12px; line-height: 1; padding-left: 2px; }
+.mmx-host .sd2-chip.miss { background: var(--warn-bg); border-color: #6b531f;
+    color: var(--warn); }
+.mmx-host .sd2-chip-add { background: none; border: 1px dashed var(--line2);
+    border-radius: 10px; color: var(--dim); font-size: 10px; padding: 2px 9px; }
+.mmx-host .sd2-chip-add:hover { border-color: var(--accent); color: var(--live); }
+
+/* @ 引用挂载弹层（fixed，挂 body） */
+.sd2-refpick { position: fixed; z-index: 9998; background: #1a1d26;
+    border: 1px solid #333a4d; border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,.55);
+    display: flex; flex-direction: column; min-width: 200px; max-width: 280px;
+    max-height: 260px; overflow-y: auto; padding: 4px; }
+.sd2-refpick button { background: none; border: none; color: #cfd3dd; text-align: left;
+    padding: 6px 10px; font-size: 12px; border-radius: 4px; cursor: pointer; }
+.sd2-refpick button:hover { background: #1e3a5c; color: #fff; }
+.sd2-refpick button.dis { color: #4a5164; cursor: default; }
+.sd2-refpick button.dis:hover { background: none; color: #4a5164; }
+.sd2-refpick .meta { color: #8b91a3; font-size: 11px; padding: 6px 10px; }
+
+/* 资产卡编辑弹层（fixed，挂 body） */
+.sd2-asset-edit { position: fixed; z-index: 9998; width: 300px; background: #1a1d26;
+    border: 1px solid #333a4d; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,.6);
+    padding: 10px; display: flex; flex-direction: column; gap: 7px;
+    font: 12px/1.5 "PingFang SC", "Microsoft YaHei", system-ui, sans-serif; color: #cfd3dd; }
+.sd2-asset-edit .hd { color: #9fb2d8; font-weight: 700; }
+.sd2-asset-edit .row { display: flex; align-items: center; gap: 8px; }
+.sd2-asset-edit .row .lbl { color: #8b91a3; width: 34px; flex: none; }
+.sd2-asset-edit .row .sd2-inp, .sd2-asset-edit .row textarea { flex: 1;
+    background: #12141b; border: 1px solid #262b38; border-radius: 4px;
+    padding: 4px 8px; color: #cfd3dd; font: inherit; }
+.sd2-asset-edit .ops { display: flex; gap: 6px; }
+.sd2-asset-edit .ops button { background: #232733; color: #cfd3dd;
+    border: 1px solid #333a4d; border-radius: 4px; padding: 3px 14px; cursor: pointer; }
+.sd2-asset-edit .ops .p { background: #2e6fd8; border-color: #2e6fd8; color: #fff; }
+.sd2-asset-edit .ops .d { color: #ff9d9d; }
+
+/* 服务配置弹窗 */
+.sd2-cfg-overlay { position: fixed; inset: 0; z-index: 9997;
+    background: rgba(4, 6, 10, .72); display: flex; align-items: center;
+    justify-content: center; }
+.sd2-cfg-overlay.hidden { display: none; }
+.sd2-cfg { width: min(560px, 92vw); max-height: 88vh; overflow-y: auto;
+    background: #1a1d26; border: 1px solid #333a4d; border-radius: 10px;
+    box-shadow: 0 16px 48px rgba(0,0,0,.65); padding: 12px 14px;
+    font: 12px/1.5 "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    color: #cfd3dd; display: flex; flex-direction: column; gap: 10px; }
+.sd2-cfg-head { display: flex; align-items: center; gap: 10px; }
+.sd2-cfg-head b { color: #9fd3ff; font-size: 13px; }
+.sd2-cfg-body { display: flex; flex-direction: column; gap: 12px; }
+.sd2-cfg-sec { border: 1px solid #262b38; border-radius: 8px; padding: 10px;
+    display: flex; flex-direction: column; gap: 7px; background: #161a24; }
+.sd2-cfg-sec .ttl { color: #9fb2d8; font-weight: 700; }
+.sd2-cfg-sec .note { color: #4a5164; font-size: 10px; line-height: 1.5; }
+.sd2-cfg-row { display: flex; align-items: center; gap: 8px; }
+.sd2-cfg-row .lbl { color: #8b91a3; width: 68px; flex: none; text-align: right; }
+.sd2-cfg-row .sd2-inp { flex: 1; background: #12141b; border: 1px solid #262b38;
+    border-radius: 4px; padding: 5px 9px; color: #cfd3dd; font: inherit; }
+.sd2-cfg-row .sd2-inp:focus { border-color: #4da3ff; outline: none; }
+.sd2-cfg-row .meta { color: #4a5164; font-size: 10px; white-space: nowrap; }
+.sd2-cfg-foot { display: flex; align-items: center; gap: 8px; }
+.sd2-cfg-foot .st.ok { color: #7fe0b2; }
+.sd2-cfg-foot .st.bad { color: #ff9d9d; }
+.sd2-cfg .sd2-btn { background: #232733; color: #cfd3dd; border: 1px solid #333a4d;
+    border-radius: 4px; padding: 4px 12px; cursor: pointer; }
+.sd2-cfg .sd2-btn:hover { background: #2b3040; }
+.sd2-cfg .sd2-btn.primary { background: #2e6fd8; border-color: #2e6fd8; color: #fff; }
+.sd2-cfg .sp { flex: 1; }
+
+/* 魔法棒错误预览块 */
+.mmx-host .sd2-pv.err { border-color: #5a2b31; }
+.mmx-host .sd2-pv.err .hd { color: var(--bad); }

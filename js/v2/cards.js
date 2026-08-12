@@ -1,14 +1,15 @@
-// cards.js —— v2 模式主区渲染：批量卡（t2v/i2v/r2v）、fl2v 镜组、
-// 全局面板、r2v 公共参数面板。设计图：ui_mockups/*.png。
+// cards.js —— v3 模式主区渲染：批量卡（t2v/i2v/r2v）与 fl2v 镜组。
+// 全局面板/公共面板已由 library.js 的全局设置区（资产库）取代。
 //
 // 交互：
 //   * 卡上改提示词（轻量 commit 不重绘，保焦点）/秒数（结构重绘）/
-//     参考图（点击上传、拖拽上传、× 清除、点击放大）/勾选运行/换序/删除；
-//   * 每段提示词框带 🪄（调 enhance.js，结果内联预览-确认-应用）；
-//   * 提示词框支持 @ 引用（图片/音频/视频编号插入 <Picture N> 等）；
-//   * 段参考图编号接在全局图片之后（对齐后端 <Picture N> 语义）。
-import { el, fmtTime, uploadImage, refThumbURL, lightbox, splitRel, setDuration,
-         viewURL } from "./util.js";
+//     首帧（i2v/r2v；点击上传、拖拽上传、× 清除、点击放大）/勾选运行/换序/删除；
+//   * 引用 chips 行（library.segRefChips）：本段挂载的按需卡，× 取消，@ 引用挂载；
+//   * 提示词框 @ 引用：选中 = 插锚点 + 挂载本段（v5「@ 引用即挂载」）；
+//   * 🪄 调 enhance.js，结果内联预览-确认-应用。
+import { el, uploadImage, refThumbURL, lightbox, setDuration,
+         assetKey, numberAssets } from "./util.js";
+import { segRefChips } from "./library.js";
 
 export function createCards(ed, { api }) {
 
@@ -31,69 +32,6 @@ export function createCards(ed, { api }) {
     async function doUpload(file) {
         const info = await uploadImage(api, file);
         return info.subfolder ? info.subfolder + "/" + info.name : info.name;
-    }
-
-    // 参考图槽（绝对编号 index，0 基；label 显示 图片{index+1}）
-    function refSlot(refList, index, onChange) {
-        const ref = refList.find((r) => Number(r.index) === index && r.imageFile);
-        const slot = el("div", "sd2-ref" + (ref ? " has" : ""));
-        let clickTimer = 0;
-        if (ref) {
-            const img = document.createElement("img");
-            img.src = refThumbURL(api, ref);
-            img.loading = "lazy";
-            slot.appendChild(img);
-            slot.appendChild(el("span", "tag", "图片" + (index + 1)));
-            const x = el("u", "x", "×");
-            x.title = "清除这张图";
-            x.addEventListener("click", (e) => {
-                e.stopPropagation();
-                clearTimeout(clickTimer);
-                const i = refList.indexOf(ref);
-                if (i >= 0) refList.splice(i, 1);
-                onChange();
-            });
-            slot.appendChild(x);
-            slot.title = "点击更换；双击放大";
-        } else {
-            slot.textContent = "图片" + (index + 1);
-            slot.title = "点击上传参考图（也可直接拖图进来）";
-        }
-        // 单击延迟 260ms 打开文件选择；双击取消单击并放大（否则先弹文件框挡住灯箱）
-        slot.addEventListener("click", () => {
-            clearTimeout(clickTimer);
-            clickTimer = setTimeout(() => filePicker(async (f) => {
-                try {
-                    const rel = await doUpload(f);
-                    const old = refList.find((r) => Number(r.index) === index);
-                    if (old) old.imageFile = rel;
-                    else refList.push({ index, imageFile: rel });
-                    onChange();
-                } catch (err) { console.error("[sd2] 上传失败", err); }
-            }), 260);
-        });
-        if (ref) {
-            slot.addEventListener("dblclick", () => {
-                clearTimeout(clickTimer);
-                lightbox(refThumbURL(api, ref), false);
-            });
-        }
-        slot.addEventListener("dragover", (e) => { e.preventDefault(); slot.classList.add("drop"); });
-        slot.addEventListener("dragleave", () => slot.classList.remove("drop"));
-        slot.addEventListener("drop", (e) => {
-            e.preventDefault();
-            slot.classList.remove("drop");
-            const f = e.dataTransfer?.files?.[0];
-            if (f && f.type.startsWith("image/")) {
-                doUpload(f).then((rel) => {
-                    const old = refList.find((r) => Number(r.index) === index);
-                    if (old) old.imageFile = rel;
-                    else refList.push({ index, imageFile: rel });
-                    onChange();
-                }).catch((err) => console.error("[sd2] 上传失败", err));
-            }
-        });
-        return slot;
     }
 
     // 16:9 图槽（i2v 源图 / fl2v 首尾帧）：obj = {imageFile}
@@ -136,197 +74,45 @@ export function createCards(ed, { api }) {
         return slot;
     }
 
-    // 音频槽（r2v 公共面板）
-    function audioSlot(refList, index, onChange) {
-        const ref = refList.find((r) => Number(r.index) === index && r.audioFile);
-        const slot = el("div", "sd2-audio" + (ref ? " has" : ""));
-        slot.textContent = ref ? "音频" + (index + 1) + " · " + splitRel(ref.audioFile).image : "音频" + (index + 1);
-        if (ref) {
-            const x = el("u", "x", "×");
-            x.addEventListener("click", (e) => {
-                e.stopPropagation();
-                refList.splice(refList.indexOf(ref), 1);
-                onChange();
-            });
-            slot.appendChild(x);
-        }
-        slot.addEventListener("click", () => {
-            const inp = document.createElement("input");
-            inp.type = "file";
-            inp.accept = "audio/*";
-            inp.style.display = "none";
-            inp.addEventListener("change", async () => {
-                const f = inp.files && inp.files[0];
-                inp.remove();
-                if (!f) return;
-                try {
-                    const rel = await doUpload(f);   // /upload/image 对音频同样可用
-                    const old = refList.find((r) => Number(r.index) === index);
-                    if (old) old.audioFile = rel;
-                    else refList.push({ index, audioFile: rel });
-                    onChange();
-                } catch (err) { console.error("[sd2] 上传失败", err); }
-            });
-            document.body.appendChild(inp);
-            inp.click();
-        });
-        return slot;
+    // @ 引用候选（v3：列资产库的卡）。选中时 mention 弹层先按 insert 插锚点，
+    // 再回调 onPick 挂载（onPick 只挂非常驻且未挂载的）。锚点编号用
+    // 「假设已挂载」的口径预算，保证插进去的编号与后端渲染时一致。
+    function mentionItems(getSeg) {
+        const s = ed.store.get();
+        const lib = s.library || [];
+        const seg = getSeg?.() || null;
+        const curRefs = seg ? (seg.libRefs || []) : [];
+        return lib.map((c) => {
+            const key = assetKey(c);
+            const pinned = c.pinned !== false;
+            if (!seg && !pinned) return null;   // 全局提示词只列常驻卡
+            const refs = curRefs.includes(key) || pinned ? curRefs : [...curRefs, key];
+            const hit = numberAssets(lib, refs).get(key);
+            return { key, pinned,
+                     label: (pinned ? "📌" : "○") + " " + key,
+                     insert: hit ? "<" + hit.tag + " " + hit.n + ">" : c.name };
+        }).filter(Boolean);
     }
 
-    // 视频槽（r2v 公共面板；上传走 /upload/image 通道）
-    function videoSlot(refList, index, onChange) {
-        const ref = refList.find((r) => Number(r.index) === index && r.videoFile);
-        const slot = el("div", "sd2-video" + (ref ? " has" : ""));
-        let clickTimer = 0;
-        if (ref) {
-            const { image, subfolder } = splitRel(ref.videoFile);
-            const v = document.createElement("video");
-            v.src = viewURL(api, image, subfolder, "input");
-            v.muted = true;
-            v.preload = "metadata";   // 首帧当缩略图
-            slot.appendChild(v);
-            slot.appendChild(el("span", "tag", "视频" + (index + 1)));
-            const x = el("u", "x", "×");
-            x.title = "清除";
-            x.addEventListener("click", (e) => {
-                e.stopPropagation();
-                clearTimeout(clickTimer);
-                refList.splice(refList.indexOf(ref), 1);
-                onChange();
-            });
-            slot.appendChild(x);
-            slot.title = "点击更换；双击放大播放";
-        } else {
-            slot.textContent = "视频" + (index + 1);
-        }
-        slot.addEventListener("click", () => {
-            clearTimeout(clickTimer);
-            clickTimer = setTimeout(() => {
-                const inp = document.createElement("input");
-                inp.type = "file";
-                inp.accept = "video/*";
-                inp.style.display = "none";
-                inp.addEventListener("change", async () => {
-                    const f = inp.files && inp.files[0];
-                    inp.remove();
-                    if (!f) return;
-                    try {
-                        const rel = await doUpload(f);
-                        const old = refList.find((r) => Number(r.index) === index);
-                        if (old) old.videoFile = rel;
-                        else refList.push({ index, videoFile: rel });
-                        onChange();
-                    } catch (err) { console.error("[sd2] 上传失败", err); }
-                });
-                document.body.appendChild(inp);
-                inp.click();
-            }, 260);
-        });
-        if (ref) {
-            slot.addEventListener("dblclick", () => {
-                clearTimeout(clickTimer);
-                const { image, subfolder } = splitRel(ref.videoFile);
-                lightbox(viewURL(api, image, subfolder, "input"), true);
-            });
-        }
-        return slot;
-    }
-
-    // 提示词框：轻量 commit + @引用 + 🪄
-    function promptArea(getPrompt, setPrompt, wandTarget, mentionScope) {
-        const wrap = el("div", "sd2-pwrap");
-        const head = el("div", "sd2-phead");
-        head.appendChild(el("span", "lbl", "提示词"));
-        const wand = el("button", "sd2-wand", "🪄 扩写");
-        wand.type = "button";
-        wand.title = "LLM 扩写这段提示词（用增强器里的配置；结果先预览，确认才应用）";
-        wand.addEventListener("click", async (e) => {
-            e.preventDefault();
-            if (wand.disabled) return;              // 防连点
-            wand.disabled = true;
-            const old = wand.textContent;
-            wand.textContent = "⏳ 扩写中…";
-            wand.classList.add("busy");
-            try {
-                await ed.enhancer.enhanceTarget(wandTarget);
-            } finally {
-                wand.disabled = false;
-                wand.textContent = old;
-                wand.classList.remove("busy");
+    function onPickMount(seg, chipsRef) {
+        return (item) => {
+            if (!seg || item.pinned) return;   // 常驻卡天然在每段，无需挂载
+            seg.libRefs = Array.isArray(seg.libRefs) ? seg.libRefs : [];
+            if (!seg.libRefs.includes(item.key)) {
+                seg.libRefs.push(item.key);
+                ed.store.commit();          // 轻量 commit（序列化生效，不重绘保焦点）
+                chipsRef?.update();         // chips 行局部刷新
             }
-        });
-        head.appendChild(wand);
-        wrap.appendChild(head);
-
-        const ta = el("textarea", "sd2-prompt");
-        ta.value = getPrompt();
-        ta.placeholder = "描述这一段的画面/运镜/声音；输入 @ 引用参考素材";
-        ta.addEventListener("input", () => { setPrompt(ta.value); maybeMention(ta); });
-        wrap.appendChild(ta);
-
-        // @ 引用弹层：跟随过滤（@后输入字符时按关键字过滤，回删到 @ 恢复全量）
-        let pop = null;
-        const closePop = () => { pop?.remove(); pop = null; };
-        function maybeMention(textarea) {
-            const pos = textarea.selectionStart;
-            const before = textarea.value.slice(0, pos);
-            const m = /(?:^|[\s，。；、（(\n])[@＠]([\w一-鿿-]{0,12})$/.exec(before);
-            if (!m) { closePop(); return; }
-            const q = m[1];
-            const items = mentionScope().filter((it) => !q || it.label.includes(q));
-            if (!items.length) { closePop(); return; }
-            closePop();
-            pop = el("div", "sd2-mention");
-            for (const it of items) {
-                const b = el("button", "", it.label);
-                b.type = "button";
-                b.addEventListener("pointerdown", (e) => {
-                    e.preventDefault();   // 不打断输入焦点
-                    e.stopPropagation();
-                    // 用引用标签替换 @查询 段
-                    const start = pos - q.length - 1;
-                    textarea.value = textarea.value.slice(0, start) + it.insert + " "
-                        + textarea.value.slice(pos);
-                    textarea.dispatchEvent(new Event("input"));
-                    closePop();
-                    textarea.focus();
-                });
-                pop.appendChild(b);
-            }
-            wrap.appendChild(pop);
-            // 点弹层外关闭（注意弹层按钮用 pointerdown 抢先处理，不会被这里误清）
-            setTimeout(() => {
-                document.addEventListener("pointerdown", function h(ev) {
-                    if (pop && !pop.contains(ev.target)) {
-                        closePop();
-                        document.removeEventListener("pointerdown", h, true);
-                    }
-                }, true);
-            }, 0);
-        }
-        return wrap;
-    }
-
-    // 增强预览块（内联在卡里；ed.preview 由 enhance.js 写）
-    function previewBlock(target) {
-        const p = ed.preview;
-        if (!p || p.target !== target) return null;
-        const box = el("div", "sd2-pv");
-        box.appendChild(el("div", "hd", "🪄 结果预览 · " + p.name + " · 确认后应用"));
-        box.appendChild(el("pre", "tx", p.text));
-        const ops = el("div", "ops");
-        const close = () => { ed.preview = null; ed.render(); };
-        const mk = (label, cls, fn) => {
-            const b = el("button", cls, label);
-            b.type = "button";
-            b.addEventListener("click", (e) => { e.preventDefault(); fn(); });
-            ops.appendChild(b);
         };
-        mk("应用", "p", () => { ed.enhancer.applyPreview(); });
-        mk("复制", "s", () => { navigator.clipboard?.writeText(p.text); });
-        mk("丢弃", "d", close);
-        box.appendChild(ops);
-        return box;
+    }
+
+    function statusTag(st) {
+        if (!st) return null;
+        const [cls, text] = st.cached && !st.will_render ? ["ok", "已缓存"]
+            : st.will_render && st.cached ? ["warn", "将级联重渲"]
+            : !st.cached ? ["bad", "待渲染"] : ["none", ""];
+        if (!text) return null;
+        return el("span", "sd2-tag " + cls, text);
     }
 
     // --- 批量卡（t2v/i2v/r2v） ----------------------------------------------
@@ -337,8 +123,6 @@ export function createCards(ed, { api }) {
         const isR2v = mode === "r2v";
         // i2v/r2v 都显示首帧槽（r2v 可用首帧做锚定；后端 genImage 全任务可读）
         const showFirstFrame = mode === "i2v" || isR2v;
-        const picOff = (s.global.refs || []).length;
-        const maxSlots = Math.max(1, 9 - picOff);
 
         const card = el("div", "sd2-card" + (i === ed.selectedIndex ? " sel" : ""));
         card.addEventListener("pointerdown", () => {
@@ -360,10 +144,10 @@ export function createCards(ed, { api }) {
             });
             head.appendChild(cb);
         }
-        head.appendChild(el("b", "", "提示词组 " + (i + 1)));
+        head.appendChild(el("b", "", "片段 " + (i + 1)));
         const st = ed.statuses?.statuses?.[i];
         head.appendChild(el("span", "meta",
-            (Number(seg.durationSec) || 5).toFixed(1) + "s · " + seg.frameCount + " 帧 @24fps"
+            (Number(seg.durationSec) || 5).toFixed(1) + "s · " + seg.frameCount + " 帧 @24fps · " + mode
             + (st?.seed != null ? " · seed " + st.seed : "")));
         head.appendChild(el("span", "sp"));
         const left = el("button", "sd2-btn sm", "◀");
@@ -405,16 +189,18 @@ export function createCards(ed, { api }) {
             row.appendChild(col);
         }
         const body = el("div", "sd2-card-body");
-        body.appendChild(promptArea(
+        const chipsRef = segRefChips(ed, { api }, seg);
+        body.appendChild(ed.promptbox.promptArea(
             () => seg.prompt,
             (v) => { seg.prompt = v; ed.store.commit(); },
-            i,
-            () => mentionItems(i),
+            { wandTarget: i,
+              mentionScope: () => mentionItems(() => seg),
+              onPick: onPickMount(seg, chipsRef) },
         ));
-        const pv = previewBlock(i);
+        const pv = ed.promptbox.previewBlock(i);
         if (pv) body.appendChild(pv);
 
-        // 时长 + 参考图
+        // 时长 + 状态徽标
         const durRow = el("div", "sd2-durrow");
         durRow.appendChild(el("span", "lbl", "秒数"));
         const dur = el("input", "sd2-inp num");
@@ -431,46 +217,10 @@ export function createCards(ed, { api }) {
         if (stTag) durRow.appendChild(stTag);
         body.appendChild(durRow);
 
-        const refsWrap = el("div", "sd2-refs");
-        for (let k = 0; k < maxSlots; k++) {
-            refsWrap.appendChild(refSlot(seg.refs, picOff + k,
-                () => ed.store.commit({ structural: true })));
-        }
-        body.appendChild(refsWrap);
+        body.appendChild(chipsRef.element);
         row.appendChild(body);
         card.appendChild(row);
         return card;
-    }
-
-    function statusTag(st) {
-        if (!st) return null;
-        const [cls, text] = st.cached && !st.will_render ? ["ok", "已缓存"]
-            : st.will_render && st.cached ? ["warn", "将级联重渲"]
-            : !st.cached ? ["bad", "待渲染"] : ["none", ""];
-        if (!text) return null;
-        return el("span", "sd2-tag " + cls, text);
-    }
-
-    function mentionItems(i) {
-        const s = ed.store.get();
-        const items = [];
-        const pic = (r) => {
-            const n = Number(r.index) + 1;
-            // 条目带了名字就显示出来（图片1 沈青霜），候选一眼能认出是谁
-            const tag = r.name ? " " + r.name : "";
-            items.push({ label: "图片" + n + tag, insert: "<Picture " + n + ">" });
-        };
-        (s.global.refs || []).forEach(pic);
-        (s.global.refAudios || []).forEach((r) => {
-            const n = Number(r.index) + 1;
-            items.push({ label: "音频" + n + (r.name ? " " + r.name : ""), insert: "<Audio " + n + ">" });
-        });
-        (s.global.refVideos || []).forEach((r) => {
-            const n = Number(r.index) + 1;
-            items.push({ label: "视频" + n + (r.name ? " " + r.name : ""), insert: "<Video " + n + ">" });
-        });
-        (s.segments[i]?.refs || []).forEach(pic);
-        return items;
     }
 
     // --- fl2v 镜组 ------------------------------------------------------------
@@ -522,13 +272,15 @@ export function createCards(ed, { api }) {
         row.appendChild(slots);
 
         const body = el("div", "sd2-card-body");
-        body.appendChild(promptArea(
+        const chipsRef = segRefChips(ed, { api }, shot);
+        body.appendChild(ed.promptbox.promptArea(
             () => shot.prompt,
             (v) => { shot.prompt = v; ed.store.commit(); },
-            "shot:" + i,
-            () => mentionItems(0),
+            { wandTarget: "shot:" + i,
+              mentionScope: () => mentionItems(() => shot),
+              onPick: onPickMount(shot, chipsRef) },
         ));
-        const pv = previewBlock("shot:" + i);
+        const pv = ed.promptbox.previewBlock("shot:" + i);
         if (pv) body.appendChild(pv);
         const durRow = el("div", "sd2-durrow");
         durRow.appendChild(el("span", "lbl", "本镜秒数"));
@@ -544,109 +296,31 @@ export function createCards(ed, { api }) {
         durRow.appendChild(el("span", "meta", "总时长 = 各镜之和（只读）："
             + total.toFixed(1) + "s"));
         body.appendChild(durRow);
+        body.appendChild(chipsRef.element);
         row.appendChild(body);
         card.appendChild(row);
         return card;
     }
 
-    // --- 全局面板 / r2v 公共面板 ----------------------------------------------
-
-    function globalPanel() {
-        const s = ed.store.get();
-        const panel = el("div", "sd2-panel");
-        const head = el("div", "sd2-card-head");
-        head.appendChild(el("b", "", "全局提示词 & 参考图 (图片1–9)"));
-        head.appendChild(el("span", "meta", "拼接到每个提示词组；参考图供各组读取"));
-        panel.appendChild(head);
-        const row = el("div", "sd2-card-row");
-        const left = el("div", "sd2-card-body");
-        left.appendChild(promptArea(
-            () => s.global.prompt,
-            (v) => { s.global.prompt = v; ed.store.commit(); },
-            "global",
-            () => mentionItems(-1),
-        ));
-        const pv = previewBlock("global");
-        if (pv) left.appendChild(pv);
-        row.appendChild(left);
-        const refsWrap = el("div", "sd2-refs nine");
-        for (let k = 0; k < 9; k++) {
-            refsWrap.appendChild(refSlot(s.global.refs, k, () => ed.store.commit({ structural: true })));
-        }
-        row.appendChild(refsWrap);
-        panel.appendChild(row);
-        return panel;
-    }
-
-    function r2vCommonPanel() {
-        const s = ed.store.get();
-        const g = s.global;
-        const panel = el("div", "sd2-panel common");
-        const head = el("div", "sd2-card-head");
-        head.appendChild(el("b", "", "公共参数（所有素材组共享）"));
-        head.appendChild(el("span", "meta", "公共参考图/音频/视频供各组读取；公共提示词拼接到每组前面"));
-        panel.appendChild(head);
-
-        panel.appendChild(promptArea(
-            () => g.prompt,
-            (v) => { g.prompt = v; ed.store.commit(); },
-            "global",
-            () => mentionItems(-1),
-        ));
-        const pv = previewBlock("global");
-        if (pv) panel.appendChild(pv);
-
-        panel.appendChild(el("div", "sd2-sec", "参考图（组内编号接公共之后）"));
-        const imgs = el("div", "sd2-refs nine");
-        for (let k = 0; k < 9; k++) {
-            imgs.appendChild(refSlot(g.refs, k, () => ed.store.commit({ structural: true })));
-        }
-        panel.appendChild(imgs);
-
-        const row2 = el("div", "sd2-card-row");
-        const audCol = el("div", "sd2-card-body");
-        audCol.appendChild(el("div", "sd2-sec", "参考音频（音频1–3）"));
-        const auds = el("div", "sd2-refs three");
-        for (let k = 0; k < 3; k++) {
-            auds.appendChild(audioSlot(g.refAudios, k, () => ed.store.commit({ structural: true })));
-        }
-        audCol.appendChild(auds);
-        row2.appendChild(audCol);
-        const vidCol = el("div", "sd2-card-body");
-        vidCol.appendChild(el("div", "sd2-sec", "参考视频（视频1–3）"));
-        const vids = el("div", "sd2-refs three");
-        for (let k = 0; k < 3; k++) {
-            vids.appendChild(videoSlot(g.refVideos, k, () => ed.store.commit({ structural: true })));
-        }
-        vidCol.appendChild(vids);
-        row2.appendChild(vidCol);
-        panel.appendChild(row2);
-        return panel;
-    }
-
     // --- 渲染入口 --------------------------------------------------------------
 
-    function render(main, globalArea) {
+    function render(main) {
         const s = ed.store.get();
         const mode = ed.store.mode();
         main.innerHTML = "";
-        globalArea.innerHTML = "";
 
         if (mode === "v2v" || mode === "rv2v") {
-            ed.videoEditor.render(main, globalArea);
+            ed.videoEditor.render(main);
             return;
         }
 
         if (ed.store.isFl2v()) {
             if (!s.shots.length) s.shots.push(ed.store.newShot(5.0));
             s.shots.forEach((sh, i) => main.appendChild(fl2vCard(sh, i)));
-            globalArea.appendChild(globalPanel());
             return;
         }
 
         s.segments.forEach((seg, i) => main.appendChild(batchCard(seg, i)));
-        if (mode === "r2v") globalArea.appendChild(r2vCommonPanel());
-        else globalArea.appendChild(globalPanel());
     }
 
     return { render };

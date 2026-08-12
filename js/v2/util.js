@@ -143,3 +143,43 @@ export function resolveSize(aspectLabel, megapixels) {
     const snap = (v) => Math.max(32, Math.round(v / 32) * 32);
     return { width: snap(w), height: snap(h) };
 }
+
+// --- 资产库（v3：常驻 pinned / 按需 + 段 libRefs 引用） ----------------------
+
+// 卡的引用键："类别·名字"（类别空时只用名字）——与后端 payload.asset_key 同形
+export function assetKey(c) {
+    return [c?.category || "", c?.name || ""].filter(Boolean).join("·");
+}
+
+export function cardFile(c) {
+    return String(c?.imageFile || c?.videoFile || c?.audioFile || "").trim();
+}
+
+// 锚点编号镜像（与后端 _asset_roster 逐条对齐）：
+// 常驻文件卡按 kind 先编（库顺序），本段 libRefs 解析卡接在后面（引用顺序，
+// 跳过已被常驻覆盖的键）；纯文本卡不占编号。返回 Map key -> {tag, n}。
+export function numberAssets(library, libRefs) {
+    const map = new Map();
+    let pic = 0, vid = 0, aud = 0;
+    const assign = (c) => {
+        if (!cardFile(c)) return;
+        const kind = c.kind || "image";
+        if (kind === "video") map.set(assetKey(c), { tag: "Video", n: ++vid });
+        else if (kind === "audio") map.set(assetKey(c), { tag: "Audio", n: ++aud });
+        else map.set(assetKey(c), { tag: "Picture", n: ++pic });
+    };
+    const pinned = (library || []).filter((c) => c.pinned !== false);
+    pinned.forEach(assign);
+    const covered = new Set(pinned.map(assetKey));
+    for (const key of libRefs || []) {
+        if (covered.has(key) || map.has(key)) continue;
+        const card = (library || []).find((c) => assetKey(c) === key);
+        if (card) assign(card);
+    }
+    return map;
+}
+
+export function anchorOf(map, key) {
+    const hit = map.get(key);
+    return hit ? "<" + hit.tag + " " + hit.n + ">" : "";
+}

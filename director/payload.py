@@ -479,6 +479,35 @@ def _d_ref_to_asset(item, kind, seen):
     return card
 
 
+def _d_lib_to_asset(item):
+    """资产库卡（timeline v4.1 的 library 行）-> 资产卡。
+
+    {category, name, imageFile, note, kind, pinned}；imageFile 是全 kind
+    通用的文件字段（历史命名，与 norm_assets 的 image 同义），可带子目录。
+    纯文本卡（无文件）同样合法（设定类资产）。不去重——库由前端管理，
+    重复卡是用户的明确意图。"""
+    if not isinstance(item, dict):
+        return None
+    rel = str(item.get("imageFile") or item.get("videoFile")
+               or item.get("audioFile") or item.get("fileName") or "").strip()
+    kind = str(item.get("kind", "") or "").strip().lower()
+    if kind not in ASSET_KINDS:
+        kind = "image"
+    card = {"category": str(item.get("category", "") or "").strip() or "参考",
+            "name": str(item.get("name", "") or "").strip()
+            or (rel.rsplit("/", 1)[-1].rsplit(".", 1)[0] if rel else ""),
+            "image": rel.replace("\\", "/"),
+            "subfolder": "",
+            "note": str(item.get("note", "") or "").strip(),
+            "kind": kind,
+            "pinned": bool(item.get("pinned", True))}
+    if "/" in card["image"]:
+        card["subfolder"], card["image"] = card["image"].rsplit("/", 1)
+    if not (card["image"] or card["name"] or card["note"]):
+        return None
+    return card
+
+
 def _d_frame_ref(item):
     """Director 首尾帧引用 {imageFile, subfolder} -> {image, subfolder}。"""
     if not isinstance(item, dict):
@@ -541,12 +570,23 @@ def parse_director(timeline_data, task_type, global_prompt, run):
     gp = str(g.get("prompt", "") or "").strip() or str(global_prompt or "").strip()
     task = _task_key_from_label(g.get("taskType") or task_type)
 
+    # 资产库（timeline v4.1）：library 非空就以它为准（含 pinned 语义与
+    # 段 libRefs 引用）；否则退回 Director 旧键（global.refs + 段内联卡，
+    # 全部常驻）——旧存档行为不变。
+    lib_rows = tl.get("library")
+    use_lib = isinstance(lib_rows, list) and bool(lib_rows)
     seen = set()
     assets = []
-    for item in g.get("refs") or []:
-        card = _d_ref_to_asset(item, "image", seen)
-        if card:
-            assets.append(card)
+    if use_lib:
+        for item in lib_rows:
+            card = _d_lib_to_asset(item)
+            if card:
+                assets.append(card)
+    else:
+        for item in g.get("refs") or []:
+            card = _d_ref_to_asset(item, "image", seen)
+            if card:
+                assets.append(card)
 
     # v2v 源视频：单源（video.fileName）或多段 videoClips
     vid = tl.get("video") or {}
@@ -574,15 +614,16 @@ def parse_director(timeline_data, task_type, global_prompt, run):
                 dur = 5.0
             seg = {"duration": dur, "prompt": str(sh.get("prompt", "") or "").strip(),
                    "nonce": str(sh.get("id", "") or ""),
-                   "refs": [],
+                   "refs": _norm_refs(sh.get("libRefs")) if use_lib else [],
                    "assets": [], "enabled": _enabled(i, sh.get("id")),
                    "first_frame": _d_frame_ref(sh.get("startImage")),
                    "last_frame": _d_frame_ref(sh.get("endImage")),
                    "source": None, "audio_mode": None, "task": "fl2v"}
-            for item in sh.get("refs") or []:
-                card = _d_ref_to_asset(item, "image", seen)
-                if card:
-                    seg["assets"].append(card)
+            if not use_lib:
+                for item in sh.get("refs") or []:
+                    card = _d_ref_to_asset(item, "image", seen)
+                    if card:
+                        seg["assets"].append(card)
             segments.append(seg)
 
     if not segments:
@@ -598,23 +639,24 @@ def parse_director(timeline_data, task_type, global_prompt, run):
             st = _task_key_from_label(s.get("taskType") or task)
             seg = {"duration": round(dur, 3), "prompt": str(s.get("prompt", "") or "").strip(),
                    "nonce": str(s.get("id", "") or ""),
-                   "refs": [],
+                   "refs": _norm_refs(s.get("libRefs")) if use_lib else [],
                    "assets": [], "enabled": _enabled(i, s.get("id")),
                    "first_frame": _d_frame_ref(s.get("genImage")),
                    "last_frame": None, "source": None,
                    "audio_mode": None, "task": st}
-            for item in s.get("refs") or []:
-                card = _d_ref_to_asset(item, "image", seen)
-                if card:
-                    seg["assets"].append(card)
-            for item in s.get("refAudios") or []:
-                card = _d_ref_to_asset(item, "audio", seen)
-                if card:
-                    seg["assets"].append(card)
-            for item in s.get("refVideos") or []:
-                card = _d_ref_to_asset(item, "video", seen)
-                if card:
-                    seg["assets"].append(card)
+            if not use_lib:
+                for item in s.get("refs") or []:
+                    card = _d_ref_to_asset(item, "image", seen)
+                    if card:
+                        seg["assets"].append(card)
+                for item in s.get("refAudios") or []:
+                    card = _d_ref_to_asset(item, "audio", seen)
+                    if card:
+                        seg["assets"].append(card)
+                for item in s.get("refVideos") or []:
+                    card = _d_ref_to_asset(item, "video", seen)
+                    if card:
+                        seg["assets"].append(card)
             # v2v/rv2v：段映射到源时间轴 [start, start+length) 帧 -> 秒
             if st in ("v2v", "rv2v"):
                 vfile = src_video
