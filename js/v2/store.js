@@ -55,6 +55,9 @@ export function createStore({ node, app, api }) {
     const totalW = widgets.total_frames;
 
     let state = load();
+    let writing = false;   // commit 写回 tlW 期间屏蔽 callback 触发的 reload
+                           //（这版前端 widget.value 赋值会触发 callback，
+                           //  不挡会让每次击键都 reload+render，输入框被换掉）
     const listeners = new Set();
     let statusTimer = 0;
     const statusWatchers = new Set();
@@ -162,7 +165,10 @@ export function createStore({ node, app, api }) {
         }
         for (const sh of state.shots) sh.durationSec = setDuration(sh.durationSec).durationSec;
         if (!AUDIO_MODES.includes(state.output.audioMode)) state.output.audioMode = "generate";
-        if (tlW) tlW.value = serialize();          // 纯赋值，绝不 defineProperty
+        if (tlW) {
+            writing = true;
+            try { tlW.value = serialize(); } finally { writing = false; }   // 纯赋值
+        }
         syncWidgets();
         app?.graph?.setDirtyCanvas?.(true, true);
         notify({ structural: !!opts.structural });
@@ -181,6 +187,7 @@ export function createStore({ node, app, api }) {
         get: () => state,
         mode, isFl2v, isVideoMode, resolveRun,
         commit, reload,
+        isWriting: () => writing,
         subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
         onStatusDirty(fn) { statusWatchers.add(fn); return () => statusWatchers.delete(fn); },
         newSegment, newShot,

@@ -253,22 +253,29 @@ export function createCards(ed, { api }) {
         ta.addEventListener("input", () => { setPrompt(ta.value); maybeMention(ta); });
         wrap.appendChild(ta);
 
-        // @ 引用弹层
+        // @ 引用弹层：跟随过滤（@后输入字符时按关键字过滤，回删到 @ 恢复全量）
         let pop = null;
         const closePop = () => { pop?.remove(); pop = null; };
         function maybeMention(textarea) {
-            const v = textarea.value.slice(0, textarea.selectionStart);
-            if (!v.endsWith("@")) { closePop(); return; }
+            const pos = textarea.selectionStart;
+            const before = textarea.value.slice(0, pos);
+            const m = /(?:^|[\s，。；、（(\n])@([\w一-鿿-]{0,12})$/.exec(before);
+            if (!m) { closePop(); return; }
+            const q = m[1];
+            const items = mentionScope().filter((it) => !q || it.label.includes(q));
+            if (!items.length) { closePop(); return; }
             closePop();
-            const items = mentionScope();   // [{label, insert}]
-            if (!items.length) return;
             pop = el("div", "sd2-mention");
             for (const it of items) {
                 const b = el("button", "", it.label);
                 b.type = "button";
-                b.addEventListener("click", () => {
-                    const pos = textarea.selectionStart;
-                    textarea.value = textarea.value.slice(0, pos) + it.insert + " " + textarea.value.slice(pos);
+                b.addEventListener("pointerdown", (e) => {
+                    e.preventDefault();   // 不打断输入焦点
+                    e.stopPropagation();
+                    // 用引用标签替换 @查询 段
+                    const start = pos - q.length - 1;
+                    textarea.value = textarea.value.slice(0, start) + it.insert + " "
+                        + textarea.value.slice(pos);
                     textarea.dispatchEvent(new Event("input"));
                     closePop();
                     textarea.focus();
@@ -276,9 +283,15 @@ export function createCards(ed, { api }) {
                 pop.appendChild(b);
             }
             wrap.appendChild(pop);
-            document.addEventListener("pointerdown", function h(ev) {
-                if (pop && !pop.contains(ev.target)) { closePop(); document.removeEventListener("pointerdown", h, true); }
-            }, true);
+            // 点弹层外关闭（注意弹层按钮用 pointerdown 抢先处理，不会被这里误清）
+            setTimeout(() => {
+                document.addEventListener("pointerdown", function h(ev) {
+                    if (pop && !pop.contains(ev.target)) {
+                        closePop();
+                        document.removeEventListener("pointerdown", h, true);
+                    }
+                }, true);
+            }, 0);
         }
         return wrap;
     }

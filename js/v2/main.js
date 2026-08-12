@@ -272,14 +272,18 @@ function initEditor(node) {
 
     store.subscribe((info) => { if (info.structural) ed.render(); });
 
-    // widget 值外部恢复（工作流加载/撤销重做）
+    // widget 值外部恢复（工作流加载/撤销重做）；
+    // commit 自己写回时 callback 也会触发——用 isWriting 挡住，不然每次击键
+    // 都会 reload+render，输入框被替换成新元素（实测：打字只进一个字符）
     const tlW = store.tlWidget();
     if (tlW) {
         const origCb = tlW.callback;
         tlW.callback = function () {
             const out = origCb?.apply(this, arguments);
-            store.reload();
-            ed.render();
+            if (!store.isWriting()) {
+                store.reload();
+                ed.render();
+            }
             return out;
         };
     }
