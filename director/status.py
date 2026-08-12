@@ -8,6 +8,8 @@ root logger 上挂一个 handler 挑 ComfyUI 的模型装卸 INFO 桥接过去�
 import logging
 import time
 
+import torch
+
 import comfy.model_management as mm
 from comfy.internal_logging import DETAIL
 from server import PromptServer
@@ -24,10 +26,16 @@ _last = {"msg": None}
 
 
 def _vram():
-    """(used, free, total) GB；拿不到就 (-1, -1, -1)，前端据此不刷新读数。"""
+    """(used, free, total) GB；拿不到就 (-1, -1, -1)，前端据此不刷新读数。
+
+    free 用 model_management 的口径（含调度记账，贴近"还能用多少"）；
+    total 直接问 torch（字节，权威）——mm.total_vram 是 MB 且只在特定
+    初始化分支赋值，不可直接用。
+    """
     try:
-        free = mm.get_free_memory(mm.get_torch_device())
-        total = float(mm.total_vram)
+        dev = mm.get_torch_device()
+        free = float(mm.get_free_memory(dev))
+        total = float(torch.cuda.get_device_properties(dev).total_memory)
         return (round((total - free) / 1024**3, 2),
                 round(free / 1024**3, 2), round(total / 1024**3, 2))
     except Exception:

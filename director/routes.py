@@ -372,3 +372,17 @@ async def status(request):
         "rendered": 0 if global_changed else sum(1 for s in statuses if s["cached"]),
         "total": len(statuses), "first_dirty": first_dirty, "statuses": statuses,
     })
+
+
+# ---------------------------------------------------------------------------
+# 显存读数（日志条调试 / 前端轮询备用）
+# ---------------------------------------------------------------------------
+
+async def _vram(request):
+    from .status import _vram as snap
+    used, free, total = snap()
+    return web.json_response({"used_gb": used, "free_gb": free,
+                              "total_gb": total})
+
+
+PromptServer.instance.routes.get("/h3_scenedirector/vram")(_vram)
