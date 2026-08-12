@@ -55,6 +55,7 @@ export function createStore({ node, app, api }) {
     const totalW = widgets.total_frames;
 
     let state = load();
+    let modes = loadModes();   // 每模式独立数据舱：切模式各用各的，互不串
     let writing = false;   // commit 写回 tlW 期间屏蔽 callback 触发的 reload
                            //（这版前端 widget.value 赋值会触发 callback，
                            //  不挡会让每次击键都 reload+render，输入框被换掉）
@@ -108,6 +109,52 @@ export function createStore({ node, app, api }) {
         return out;
     }
 
+    // --- 每模式数据舱 ---------------------------------------------------------
+    // 切片 = 模式私有的段/镜组/源视频；global（全局提示词+公共参考）全模式共享。
+    // 序列化时 `_modes` 作为随行字段写进 JSON（后端 parse_director 只认固定键，
+    // 多余键自动忽略，无副作用）。
+
+    function defaultSlice(key) {
+        return {
+            segments: [newSegment(5.0)],
+            shots: key === "fl2v" ? [newShot(5.0)] : [],
+            video: { fileName: "", subfolder: "", frames: 0 },
+            videoClips: [],
+        };
+    }
+
+    function loadModes() {
+        try {
+            const data = JSON.parse(tlW?.value || "{}");
+            if (data && typeof data === "object" && data._modes && typeof data._modes === "object") {
+                return data._modes;
+            }
+        } catch (e) { /* 无则空 */ }
+        return {};
+    }
+
+    function currentSlice() {
+        return {
+            segments: state.segments,
+            shots: state.shots,
+            video: state.video,
+            videoClips: state.videoClips,
+        };
+    }
+
+    function setMode(key) {
+        const cur = mode();
+        if (cur === key) return;
+        modes[cur] = currentSlice();                 // 收好当前模式的
+        const next = modes[key] || defaultSlice(key); // 取出/新建目标模式的
+        state.segments = next.segments && next.segments.length ? next.segments : [newSegment(5.0)];
+        state.shots = Array.isArray(next.shots) ? next.shots : [];
+        state.video = next.video || { fileName: "", subfolder: "", frames: 0 };
+        state.videoClips = Array.isArray(next.videoClips) ? next.videoClips : [];
+        state.global.taskType = key;
+        commit({ structural: true });
+    }
+
     const mode = () => taskKeyFromLabel(state.global.taskType || taskW?.value);
     const isFl2v = () => mode() === "fl2v";
     const isVideoMode = () => mode() === "v2v" || mode() === "rv2v";
@@ -126,6 +173,7 @@ export function createStore({ node, app, api }) {
         }
         tl.output = tl.output || {};
         tl.output.runSelection = state.runSelectEnabled ? state.runSelection : null;
+        tl._modes = { ...modes, [mode()]: currentSlice() };   // 数据舱随行（后端忽略）
         return JSON.stringify(tl);
     }
 
@@ -180,12 +228,13 @@ export function createStore({ node, app, api }) {
     // 外部改写（工作流加载/撤销）：重新读 widget
     function reload() {
         state = load();
+        modes = loadModes();
         notify({ structural: true, external: true });
     }
 
     return {
         get: () => state,
-        mode, isFl2v, isVideoMode, resolveRun,
+        mode, isFl2v, isVideoMode, resolveRun, setMode,
         commit, reload,
         isWriting: () => writing,
         subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },

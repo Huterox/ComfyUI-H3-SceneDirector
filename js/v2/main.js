@@ -87,10 +87,9 @@ function buildSkeleton(ed) {
         b.title = label;
         b.addEventListener("click", () => {
             if (ed.store.mode() === key) return;
-            ed.store.get().global.taskType = key;
+            ed.store.setMode(key);      // 每模式独立数据舱：收起当前、切出目标
             ed.selectedIndex = 0;
             linkModel(ed.node, key);
-            ed.store.commit({ structural: true });
         });
         tabs.appendChild(b);
     }
