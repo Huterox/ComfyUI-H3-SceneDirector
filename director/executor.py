@@ -44,7 +44,6 @@ from .colorlock import (stats as cl_stats, match_smooth as cl_match,
                         luma_of as cl_luma_of, luma_match as cl_luma_match)
 from . import plan as PL
 from . import vram as VRAM
-from . import budget as B
 from .status import emit_log
 
 _LOG = logging.getLogger("h3_scenedirector")
@@ -223,8 +222,6 @@ def _encode_story_impl(clip, vae, audio_vae, segments_raw, width, height,
             first_frame=ff, last_frame=lf,
             ref_items=ref_items, ref_blocks=ref_blocks)
         conds.append(cond)
-    # 全部段编码完毕，采样循环不再用文本编码器：主动卸载清场
-    B.unload_clip(clip)
     return {"width": int(width), "height": int(height), "conds": conds}
 
 
@@ -319,7 +316,7 @@ def _run_chain_impl(model, vae, audio_vae, segments_raw, story_cond, sampler,
                     encode_mode, anchor_mode, audio_mode, crop, cfg, cache_tag,
                     uniform_window=False, color_lock=False, negative=None,
                     continuity=True, seam_blend=True, vram_cleanup=False,
-                    node_id=None, vram_budget=True, luma_lock=False):
+                    node_id=None, luma_lock=False):
     """链条主循环：缓存命中段直接解码，自第一个变动段起级联重渲；
     未勾选段（选择运行关闭）走缓存填充。返回 (images, audio, contact_sheet, info)。
 
@@ -407,29 +404,6 @@ def _run_chain_impl(model, vae, audio_vae, segments_raw, story_cond, sampler,
     emit_log("run %s 开始：%d 段（%d 新渲染 / %d 缓存），衔接 %s"
              % (run, len(segs), n_render, n_cached,
                 "开" if continuity else "关"))
-
-    # 显存规划：按本次 run 的最大渲染窗口估算采样激活余量，采样期间抬高
-    # 全局保留量压低 DiT 权重驻留；同时修正 H3 VAE 的 decode 内存估算
-    # （其内建 17 帧滑窗是流式的，通用公式按整段高估，会引发无谓的权重往返）
-    reserve_bytes = 0
-    if vram_budget:
-        B.fix_vae_decode_estimate(vae)
-        span_est = next((g for g in VIDEO_RUN_GRID if g <= int(context_length)), 1) \
-            if continuity else 0
-        dur_max = max(s["duration"] for s in segs)
-        n_imgs = sum(1 for a in assets
-                     if a["image"] and a.get("kind", "image") == "image")
-        n_imgs += max((sum(1 for a in (s.get("assets") or [])
-                           if a["image"] and a.get("kind", "image") == "image")
-                       for s in segs), default=0)
-        window = P.align_frame_count(max(5, round(dur_max * P.FPS)) + span_est)
-        reserve_bytes = B.estimate_sample_reserve(
-            width, height, window, cond_frames=span_est, n_ref_images=n_imgs,
-            duration_s=dur_max)
-        _LOG.info("显存规划：采样余量 %.1f GB（窗口 %d 帧, %dx%d, 参考图 %d 张）",
-                  reserve_bytes / 1024**3, window, width, height, n_imgs)
-        emit_log("显存规划：采样余量 %.1f GB（窗口 %d 帧 %dx%d）"
-                 % (reserve_bytes / 1024**3, window, width, height))
 
     all_images, all_audio = [], None
     seg_meta, info_lines = [], []
@@ -533,24 +507,8 @@ def _run_chain_impl(model, vae, audio_vae, segments_raw, story_cond, sampler,
                 except Exception:
                     pass
 
-            # 保留量只在采样期间抬高：decode 阶段回落默认，VAE 腾挪时
-            # 不必把 DiT 权重卸得太狠，下一段采样少拉回来。
-            # 采样前主动压舱：已驻留的权重不受保留量约束（dynamic 模型
-            # 互不相卸、partially_load 只增不减），不压就会带着高驻留
-            # 撞上第二段起更大的激活峰值。
-            if vram_budget:
-                with B.reserved_vram(reserve_bytes):
-                    B.clamp_weight_residency(
-                        model, B.weight_keep_bytes(reserve_bytes), name="DiT")
-                    B.clamp_weight_residency(vae.patcher, 256 * 1024**2,
-                                             name="视频VAE")
-                    B.clamp_weight_residency(audio_vae.patcher, 256 * 1024**2,
-                                             name="音频VAE")
-                    latent = _sample(model, positive, latent_in, seg_seed,
-                                     sampler, sigmas, negative, cfg, live=_live)
-            else:
-                latent = _sample(model, positive, latent_in, seg_seed,
-                                 sampler, sigmas, negative, cfg, live=_live)
+            latent = _sample(model, positive, latent_in, seg_seed,
+                             sampler, sigmas, negative, cfg, live=_live)
             imgs, aud = decode_av(vae, audio_vae, latent["samples"])
             VRAM.cleanup_segment_vram(vram_cleanup)
 
