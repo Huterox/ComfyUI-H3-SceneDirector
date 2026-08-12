@@ -1,5 +1,8 @@
-// SceneDirector 主题装载：注入我们的样式 + 微调展示层结构（不动交互）。
-// 视觉对齐我们先前的工作台：实时预览大屏置顶、舞台区紧随工具条。
+// SceneDirector 主题装载：注入我们的样式 + 两个确认过的行为补丁。
+// 布局 100% Director 原生（不挪任何 DOM）；这里只做：
+//   1. 全局提示词可见性修复（批量/fl2v 模式强制放出底部全局面板）
+//   2. 增强结果预览 -> 确认才应用（用户点单的行为）
+//   3. 增强器大渐变按钮打类名，颜色交给 css（!important 压内联）
 import { app } from "../../../scripts/app.js";
 
 const css = document.createElement("link");
@@ -82,6 +85,9 @@ function polish(node) {
             });
             mk("丢弃", "h3sd-btn danger", hide);
             pe.body?.insertBefore(box, pe.body.firstChild);
+            // 两根全宽渐变按钮（内联 #3b82f6/#6366f1）打类名交给主题
+            pe.enhanceCurrentBtn?.classList.add("h3sd-pe-btn", "cur");
+            pe.enhanceAllBtn?.classList.add("h3sd-pe-btn", "all");
             if (origApply) {
                 pe.setActivePromptText = (text) => {
                     if (pe._h3sdPreviewNext) {
@@ -99,18 +105,6 @@ function polish(node) {
                     cur.addEventListener("click", () => { pe._h3sdPreviewNext = true; }, true);
                 }
             }
-        }
-        // 实时预览大屏提到主区最上方（我们旧工作台的位置）
-        const live = ed.liveSampleEl;
-        if (live && ed.mainBody && live.parentElement === ed.mainBody) {
-            ed.mainBody.insertBefore(live, ed.mainBody.firstChild);
-            live.classList.remove("hidden");
-        }
-        // 舞台区提到时间轴画布之前
-        const stage = ed.root?.querySelector('.bd-stage');
-        const viewport = ed.viewport;
-        if (stage && viewport && stage.parentElement === viewport.parentElement) {
-            viewport.parentElement.insertBefore(stage, viewport);
         }
     } catch (e) {
         console.warn("[SceneDirector] 主题微调失败（忽略）", e);
