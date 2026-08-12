@@ -1,0 +1,235 @@
+/* skin.css —— v2 前端皮肤（设计图 ui_mockups/*.png 的深蓝黑质感）。
+   作用域 .mmx-host（我们自有 DOM widget 的容器，与 Director 同款类名）。 */
+
+.mmx-host .sd2 {
+    --bg: #14161c; --panel: #1a1d26; --panel2: #20242f; --screen: #0c0e13;
+    --well: #12141b; --line: #262b38; --line2: #333a4d;
+    --text: #cfd3dd; --dim: #8b91a3; --dimmer: #4a5164;
+    --accent: #4da3ff; --accent2: #2e6fd8; --live: #9fd3ff;
+    --ok-bg: #1e4636; --ok: #7fe0b2;
+    --warn-bg: #4d3a17; --warn: #ffd27f;
+    --bad-bg: #4d1f24; --bad: #ff9d9d;
+    background: var(--bg); color: var(--text);
+    font: 12px/1.5 "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    border-radius: 8px;
+    display: flex; flex-direction: column; gap: 8px;
+    width: 100%; box-sizing: border-box;
+}
+.mmx-host .sd2 * { box-sizing: border-box; }
+.mmx-host .sd2 button { font: inherit; cursor: pointer; }
+.mmx-host .sd2 input, .mmx-host .sd2 textarea, .mmx-host .sd2 select {
+    font: inherit; color: var(--text);
+}
+.mmx-host .sd2 ::-webkit-scrollbar { width: 8px; height: 8px; }
+.mmx-host .sd2 ::-webkit-scrollbar-thumb { background: #2c3140; border-radius: 4px; }
+.mmx-host .sd2 ::-webkit-scrollbar-track { background: transparent; }
+.mmx-host .sd2 .hidden { display: none !important; }
+.mmx-host .sd2 .sp { flex: 1; }
+.mmx-host .sd2 .lbl { color: var(--dim); white-space: nowrap; }
+.mmx-host .sd2 .meta { color: var(--dim); font-size: 11px; }
+
+/* ---------- 工具条 ---------- */
+.mmx-host .sd2-bar { display: flex; align-items: center; gap: 8px; background: var(--panel);
+    border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; flex-wrap: wrap; }
+.mmx-host .sd2-logo { color: var(--live); font-weight: 700; letter-spacing: .05em;
+    text-shadow: 0 0 12px rgba(77, 163, 255, .35); }
+.mmx-host .sd2-tabs { display: flex; border: 1px solid var(--line2); border-radius: 4px; overflow: hidden; }
+.mmx-host .sd2-tabs button { background: #232733; color: var(--dim); border: none; padding: 4px 10px; }
+.mmx-host .sd2-tabs button:hover { background: #2b3040; color: var(--text); }
+.mmx-host .sd2-tabs button.on { background: var(--accent2); color: #fff; }
+.mmx-host .sd2-run { background: var(--well); border: 1px solid var(--line); border-radius: 4px;
+    padding: 4px 8px; width: 130px; }
+.mmx-host .sd2-run:focus { border-color: var(--accent); outline: none; }
+.mmx-host .sd2-sum { color: var(--dim); white-space: nowrap; }
+.mmx-host .sd2-btn { background: #232733; color: var(--text); border: 1px solid var(--line2);
+    border-radius: 4px; padding: 4px 12px; }
+.mmx-host .sd2-btn:hover { background: #2b3040; border-color: #46507a; }
+.mmx-host .sd2-btn.primary { background: var(--accent2); border-color: var(--accent2); color: #fff; }
+.mmx-host .sd2-btn.primary:hover { background: #3b7fe8; }
+.mmx-host .sd2-btn.danger, .mmx-host .sd2-btn.sm.danger { color: var(--bad); border-color: #5a2b31; }
+.mmx-host .sd2-btn.danger:hover { background: var(--bad-bg); }
+.mmx-host .sd2-btn.sm { padding: 2px 8px; font-size: 11px; }
+.mmx-host .sd2-btn.active { background: #1e3a5c; border-color: var(--accent); color: var(--live); }
+.mmx-host .sd2-inp { background: var(--well); border: 1px solid var(--line); border-radius: 4px;
+    padding: 4px 8px; }
+.mmx-host .sd2-inp:focus { border-color: var(--accent); outline: none; }
+.mmx-host .sd2-inp.num { width: 56px; text-align: center; }
+.mmx-host .sd2 .chk { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+.mmx-host .sd2 input[type="checkbox"] { accent-color: var(--accent2); }
+
+/* ---------- 实时预览条 ---------- */
+.mmx-host .sd2-live { position: relative; background: var(--screen); border: 1px solid var(--line);
+    border-radius: 6px; min-height: 120px; max-height: 300px; overflow: hidden;
+    display: flex; align-items: center; justify-content: center; }
+.mmx-host .sd2-live img { max-width: 100%; max-height: 300px; object-fit: contain; display: block; }
+.mmx-host .sd2-live .tag { position: absolute; left: 8px; bottom: 8px; font-size: 11px;
+    color: var(--live); background: rgba(10, 12, 18, .78); border-radius: 4px; padding: 2px 8px; }
+
+/* ---------- 主区与卡片 ---------- */
+.mmx-host .sd2-main { display: flex; flex-direction: column; gap: 8px;
+    max-height: 460px; overflow-y: auto; padding-right: 2px; }
+.mmx-host .sd2-card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+    padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
+.mmx-host .sd2-card.sel { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(77, 163, 255, .35); }
+.mmx-host .sd2-card-head { display: flex; align-items: center; gap: 8px;
+    border-bottom: 1px solid var(--line); padding-bottom: 5px; flex-wrap: wrap; }
+.mmx-host .sd2-card-head b { color: #9fb2d8; font-size: 12px; }
+.mmx-host .sd2-card-row { display: flex; gap: 10px; align-items: flex-start; }
+.mmx-host .sd2-card-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.mmx-host .sd2-framesrc { flex: none; display: flex; flex-direction: column; gap: 4px; }
+
+/* 提示词区 + 魔法棒 */
+.mmx-host .sd2-pwrap { position: relative; display: flex; flex-direction: column; gap: 4px; }
+.mmx-host .sd2-phead { display: flex; align-items: center; gap: 6px; }
+.mmx-host .sd2-wand { background: #232733; border: 1px solid var(--line2); border-radius: 4px;
+    color: var(--live); font-size: 10px; padding: 0 7px; line-height: 1.7; }
+.mmx-host .sd2-wand:hover { background: #2b3040; border-color: var(--accent); }
+.mmx-host .sd2-prompt { width: 100%; min-height: 64px; background: var(--well);
+    border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px;
+    font-size: 12px; line-height: 1.55; resize: vertical; }
+.mmx-host .sd2-prompt:focus { border-color: var(--accent); outline: none; }
+
+/* @引用弹层 */
+.mmx-host .sd2-mention { position: absolute; z-index: 30; top: 100%; left: 0;
+    background: var(--panel); border: 1px solid var(--line2); border-radius: 6px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .55); display: flex; flex-direction: column;
+    min-width: 140px; max-height: 200px; overflow-y: auto; }
+.mmx-host .sd2-mention button { background: none; border: none; color: var(--text);
+    text-align: left; padding: 6px 10px; font-size: 12px; }
+.mmx-host .sd2-mention button:hover { background: #1e3a5c; color: #fff; }
+
+/* 预览块（魔法棒结果） */
+.mmx-host .sd2-pv { background: var(--screen); border: 1px solid #3a4265; border-radius: 6px; }
+.mmx-host .sd2-pv .hd { padding: 5px 10px; font-size: 11px; color: var(--live);
+    border-bottom: 1px solid var(--line); }
+.mmx-host .sd2-pv .tx { margin: 0; padding: 8px 10px; max-height: 200px; overflow-y: auto;
+    white-space: pre-wrap; word-break: break-word; font-size: 12px; line-height: 1.55; }
+.mmx-host .sd2-pv .ops { display: flex; gap: 6px; padding: 0 10px 8px; }
+.mmx-host .sd2-pv .ops button { background: #232733; color: var(--text);
+    border: 1px solid var(--line2); border-radius: 4px; padding: 3px 14px; }
+.mmx-host .sd2-pv .ops .p { background: var(--accent2); border-color: var(--accent2); color: #fff; }
+.mmx-host .sd2-pv .ops .d { color: var(--bad); }
+
+/* 时长行 / 状态徽标 */
+.mmx-host .sd2-durrow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.mmx-host .sd2-tag { border-radius: 3px; font-size: 10px; padding: 1px 6px; }
+.mmx-host .sd2-tag.ok { background: var(--ok-bg); color: var(--ok); }
+.mmx-host .sd2-tag.warn { background: var(--warn-bg); color: var(--warn); }
+.mmx-host .sd2-tag.bad { background: var(--bad-bg); color: var(--bad); }
+
+/* 参考图槽 */
+.mmx-host .sd2-refs { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+    gap: 5px; }
+.mmx-host .sd2-refs.nine { grid-template-columns: repeat(9, minmax(0, 1fr)); flex: 1; }
+.mmx-host .sd2-refs.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.mmx-host .sd2-ref { aspect-ratio: 1; max-height: 84px; background: var(--screen);
+    border: 1px dashed var(--line2); border-radius: 6px; display: flex; align-items: center;
+    justify-content: center; color: var(--dimmer); font-size: 10px; overflow: hidden;
+    position: relative; cursor: pointer; }
+.mmx-host .sd2-ref:hover { border-color: var(--accent); color: var(--dim); }
+.mmx-host .sd2-ref.has { border-style: solid; }
+.mmx-host .sd2-ref.drop { border-color: var(--accent); background: #141822; }
+.mmx-host .sd2-ref img { width: 100%; height: 100%; object-fit: cover; }
+.mmx-host .sd2-ref .tag { position: absolute; left: 0; right: 0; bottom: 0; font-size: 9px;
+    text-align: center; background: linear-gradient(180deg, transparent, rgba(6, 8, 12, .85));
+    color: var(--text); padding: 8px 2px 3px; pointer-events: none; }
+.mmx-host .sd2-ref .x, .mmx-host .sd2-frame .x, .mmx-host .sd2-audio .x, .mmx-host .sd2-video .x {
+    position: absolute; top: 2px; right: 4px; color: var(--bad); font-size: 13px; line-height: 1;
+    text-decoration: none; z-index: 2; font-style: normal; cursor: pointer; }
+
+/* 16:9 图槽（i2v 源图 / fl2v 首尾帧） */
+.mmx-host .sd2-flslots { display: flex; align-items: center; gap: 8px; flex: none; }
+.mmx-host .sd2-flslots .arr { color: var(--dimmer); font-size: 16px; }
+.mmx-host .sd2-frame { width: 150px; aspect-ratio: 16/9; background: var(--screen);
+    border: 1px dashed var(--line2); border-radius: 6px; overflow: hidden; position: relative;
+    display: flex; align-items: center; justify-content: center; color: var(--dimmer);
+    font-size: 10px; text-align: center; cursor: pointer; }
+.mmx-host .sd2-framesrc .sd2-frame { width: 200px; }
+.mmx-host .sd2-frame:hover { border-color: var(--accent); color: var(--dim); }
+.mmx-host .sd2-frame.has { border-style: solid; }
+.mmx-host .sd2-frame img { width: 100%; height: 100%; object-fit: cover; }
+.mmx-host .sd2-frame .cap { position: absolute; left: 0; right: 0; bottom: 0; font-size: 9px;
+    text-align: center; background: linear-gradient(180deg, transparent, rgba(6, 8, 12, .85));
+    color: var(--text); padding: 6px 2px 3px; pointer-events: none; }
+
+/* 音频/视频槽 */
+.mmx-host .sd2-audio, .mmx-host .sd2-video { min-height: 44px; background: var(--screen);
+    border: 1px dashed var(--line2); border-radius: 6px; display: flex; align-items: center;
+    justify-content: center; color: var(--dimmer); font-size: 10px; padding: 6px;
+    position: relative; cursor: pointer; text-align: center; word-break: break-all; }
+.mmx-host .sd2-video { aspect-ratio: 16/9; }
+.mmx-host .sd2-audio:hover, .mmx-host .sd2-video:hover { border-color: var(--accent); color: var(--dim); }
+.mmx-host .sd2-audio.has, .mmx-host .sd2-video.has { border-style: solid; border-color: #2f4a5f;
+    background: #15202e; color: #b8d4ea; }
+
+/* 面板（全局/公共/v2v 占位） */
+.mmx-host .sd2-panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+    padding: 8px 10px; display: flex; flex-direction: column; gap: 8px; }
+.mmx-host .sd2-panel.common { background: linear-gradient(180deg, #1c2230, #161a24);
+    border-color: var(--line2); }
+.mmx-host .sd2-sec { color: #9fb2d8; font-size: 12px; font-weight: 700; }
+
+/* ---------- 输出条 ---------- */
+.mmx-host .sd2-out { display: flex; align-items: center; gap: 8px; background: var(--panel);
+    border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; flex-wrap: wrap; }
+
+/* ---------- 胶片带 ---------- */
+.mmx-host .sd2-fs { background: var(--screen); border: 1px solid var(--line); border-radius: 6px;
+    padding: 5px 8px 7px; }
+.mmx-host .sd2-ruler { position: relative; height: 14px; border-bottom: 1px solid var(--line);
+    margin-bottom: 5px; }
+.mmx-host .sd2-ruler .tick { position: absolute; top: 0; font-size: 9px; color: var(--dim);
+    font-variant-numeric: tabular-nums; }
+.mmx-host .sd2-track { display: flex; gap: 3px; height: 64px; overflow-x: auto; }
+.mmx-host .sd2-track .cell { position: relative; height: 100%; flex: 0 0 auto; min-width: 64px;
+    background: #14161c; border: 1px solid var(--line); border-radius: 4px; overflow: hidden;
+    cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.mmx-host .sd2-track .cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.mmx-host .sd2-track .cell.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.mmx-host .sd2-track .cell.playable:hover { border-color: var(--line2); }
+.mmx-host .sd2-track .empty { color: var(--dimmer); font-size: 18px; }
+.mmx-host .sd2-track .dot { position: absolute; top: 3px; right: 3px; width: 8px; height: 8px;
+    border-radius: 50%; background: var(--dimmer); }
+.mmx-host .sd2-track .dot.ok { background: #35b8a3; }
+.mmx-host .sd2-track .dot.warn { background: var(--warn); }
+.mmx-host .sd2-track .dot.bad { background: var(--bad); }
+.mmx-host .sd2-track .idx { position: absolute; left: 4px; bottom: 2px; font-size: 10px;
+    color: var(--text); text-shadow: 0 1px 2px #000; }
+
+/* ---------- 状态行 ---------- */
+.mmx-host .sd2-status { display: flex; align-items: center; gap: 10px; background: var(--panel);
+    border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; }
+.mmx-host .sd2-status .txt b { color: var(--live); font-weight: 600; }
+.mmx-host .sd2-pbar { flex: 1; height: 6px; background: var(--panel2); border-radius: 7px; overflow: hidden; }
+.mmx-host .sd2-pbar u { display: block; height: 100%; width: 0;
+    background: linear-gradient(90deg, var(--accent2), #35b8a3); border-radius: 7px;
+    transition: width .2s ease; }
+.mmx-host .sd2-status .pct { min-width: 36px; text-align: right; color: var(--dim); }
+
+/* ---------- 增强器面板 ---------- */
+.mmx-host .sd2-pe { background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+    padding: 6px 10px; }
+.mmx-host .sd2-pe-head { display: flex; align-items: center; gap: 8px; }
+.mmx-host .sd2-pe-head .ttl { color: #9fb2d8; font-weight: 700; }
+.mmx-host .sd2-pe-body { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.mmx-host .sd2-pe-row { display: flex; align-items: center; gap: 8px; }
+.mmx-host .sd2-pe-row .lbl { width: 56px; flex: none; }
+.mmx-host .sd2-pe-row .sd2-inp { flex: 1; }
+.mmx-host .sd2-pe-row textarea.sd2-prompt { min-height: 48px; flex: 1; }
+.mmx-host .sd2-pe-status { font-size: 11px; color: var(--dim); min-height: 14px; }
+.mmx-host .sd2-pe-status.error { color: var(--bad); }
+.mmx-host .sd2-pe-status.success { color: var(--ok); }
+.mmx-host .sd2-pe-status.loading { color: var(--warn); }
+
+/* ---------- 灯箱 ---------- */
+.sd2-lightbox { position: fixed; inset: 0; z-index: 9999; background: rgba(4, 6, 10, .85);
+    display: flex; align-items: center; justify-content: center; cursor: zoom-out; }
+.sd2-lightbox img, .sd2-lightbox video { max-width: 92vw; max-height: 92vh;
+    border-radius: 6px; cursor: default; }
+.sd2-lightbox .x { position: absolute; top: 14px; right: 20px; color: #fff; font-size: 26px; }
+
+/* 收紧：r2v 公共面板音/视槽别撑太大 */
+.mmx-host .sd2-refs.three { grid-template-columns: repeat(3, minmax(0, 168px)); }
+.mmx-host .sd2-video { max-height: 96px; }
+.mmx-host .sd2-ruler { overflow: hidden; }
+.mmx-host .sd2-ruler .inner { position: relative; height: 100%; }
