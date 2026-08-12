@@ -17,6 +17,9 @@
     /* 节点拉高时内容跟着撑满：吃满 DOM widget 的分配高度，
        多出的高度由主区（flex:1）吸收 */
     height: 100%;
+    /* 内容比分配高度还高时（如 r2v 公共面板）不许溢出节点：
+       主区与全局区各自内部滚动 */
+    overflow: hidden;
 }
 .mmx-host .sd2 * { box-sizing: border-box; }
 .mmx-host .sd2 button { font: inherit; cursor: pointer; }
@@ -265,3 +268,6 @@
 .mmx-host .sd2-vseg .grip { position: absolute; right: 0; top: 0; bottom: 0; width: 8px;
     cursor: col-resize; }
 .mmx-host .sd2-vseg .grip:hover { background: rgba(77, 163, 255, .35); }
+
+/* 溢出约束（r2v 公共面板这类高内容）：全局区封顶 42% 自滚，主区吸收剩余 */
+.mmx-host .sd2-global { flex: 0 1 auto; max-height: 42%; overflow-y: auto; }
