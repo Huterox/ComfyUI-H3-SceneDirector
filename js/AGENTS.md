@@ -1,58 +1,57 @@
-# 前端嵌入契约（js/ 下所有 UI 代码必须遵守）
+# 前端契约（js/v2/ 所有代码必须遵守）
 
-> 来源：逐条核实自正在运行的代码（minimax_timeline.js / 旧工作台血泪教训）。
-> 任何新 UI 只能在此契约内做增量；违反任意一条的代码不许合入。
+> v2 为自研前端（唯一前端，旧 Director fork 已删）。本契约的每条都来自
+> 真实事故/实测，违反的代码不许合入。
 
 ## 一、挂载（节点嵌入）
 
 1. **入口**：`app.registerExtension` + `beforeRegisterNodeDef` 包 `onNodeCreated`
-   （先调 orig 再干我们的），`loadedGraphNode` 兜底；节点识别用
-   `nodeData.name === "H3SceneDirectorList"`。挂载必须幂等（`node._xxx` 守卫）。
-   （minimax_timeline.js:9577, 9688–9733）
-2. **DOM 容器唯一**：全节点只有一个 DOM widget——Director 的
-   `addDOMWidget("minimax_director_ui", "director", container.mmx-host, …)`
-   （minimax_timeline.js:9742–9765）。我们的 UI 一律挂进 `node._minimaxEditor`
-   的 DOM 树（`ed.mainBody` / `ed.root` 内的已有元素）。
-   **绝不新建 DOM widget，绝不改 addDOMWidget 的参数。**
-3. **编辑器实例**：`node._minimaxEditor` 在 `setTimeout(0)` 之后才建好
-   （initDirectorEditor，minimax_timeline.js:1014–1039）。我们的挂载点延迟
-   ≥900ms 再读它，读不到就放弃挂载（不可 crash 节点创建流程）。
+   （先调 orig），`loadedGraphNode` 兜底恢复；识别
+   `nodeData.name === "H3SceneDirectorList"`；`node._h3sdEditor` 幂等守卫。
+   （js/v2/main.js）
+2. **DOM 容器唯一**：一个 `div.mmx-host` + `addDOMWidget("h3sd_ui", "div", …)`。
+   一切 UI 挂进这个容器，绝不新建第二个 DOM widget。
+3. **编辑器实例**：widget 建完后 `setTimeout(0)` 再建（等 widget 就位），
+   存 `node._h3sdEditor`；读不到容器就放弃挂载，不可 crash 节点创建。
 
-## 二、尺寸契约（先前所有"UI 甩出节点/塌缩" bug 的根）
+## 二、尺寸契约（血泪区）
 
-4. **高度**：由 Director 的 `computeSize` / `computeLayoutSize` /
-   `options.getMinHeight` 驱动（bindDirectorDomWidgetSizing，
-   minimax_timeline.js:1000–1012）。我们不覆写 computeSize、不调 setSize 改高。
-5. **宽度**：前端会把元素宽钉成内联像素值，Director 用
-   `ensureDirectorDomWidgetWidth` 在 onDraw/afterResize/onResize/onSelected
-   里跟随（minimax_timeline.js:9747–9794）。我们的内容只用流体布局
-   （百分比/flex/minmax）跟宽，**不测量、不钉宽、不用 ResizeObserver**。
-6. **容器最低高**：`.mmx-host` 上有 `--comfy-widget-min-height` 变量和内联
-   minHeight；我们的内容高度超出时自己滚（overflow:auto），不撑破。
+4. **高度**：只给 `getMinHeight` 保底（静态 BASE_H=700）。
+   **绝不覆写 computeSize/computeLayoutSize**——这版前端会把高度钉死在
+   内容高，节点拉高不跟随（实测 630 钉死 vs 删除后跟随 1236）。
+   内容跟高靠 `height:100%` + 主区 `flex:1` 自滚。
+   **也不能用 scrollHeight 动态算保底高**——分配高度回流进测量值，
+   形成只涨不缩的反馈环（实测 1227 钉死）。
+5. **宽度**：`ensureWidth(node)`（容器宽 = 节点宽 - 20）在 onDraw /
+   afterResize / onResize / onSelected 四处驱动；容器内部全流体布局，
+   不测量、不钉宽、不用 ResizeObserver。
 
 ## 三、数据与序列化
 
-7. **序列化载体是隐藏 widget**（timeline_data 等）。写值只准普通赋值
-   `widget.value = x`（可加 callback 包装同步）。
-   **绝不对 widget.value 用 Object.defineProperty**——前端把它定义成不可配置
-   属性，重定义抛 `Cannot redefine property: value`，直接搞崩工作流加载。
-8. **一切数据修改走 `ed.commit(false, { syncTimeline: true })`**，让 Director
-   自己序列化。注意 commit 链上的 `flushBatchPromptInputs` 会用批量卡 textarea
-   的 DOM 值覆盖段数据——**改段提示词必须同步对应 textarea 的 value 并派发
-   input 事件**，否则序列化时被旧草稿覆盖回去。
-9. **包装方法要链式**：保存 orig、我们的包装里先/后调 orig、onRemoved 里还原；
-   WS 监听与定时器必须在 onRemoved 退订/清理。
+6. **序列化载体是隐藏 widget**（timeline_data / run_name / llm_* 等）。
+   写值只准普通赋值 `widget.value = x`。**绝不用 Object.defineProperty**
+   （前端定义成不可配置，重定义抛错崩工作流加载）。
+7. **一切修改走 `store.commit()`**：统一序列化 + 同步关联 widget + 广播。
+   打字走轻量 commit（不重绘、保焦点），结构变更才 structural 重绘。
+8. **JSON schema 与后端 `parse_director` 逐字段对齐**（director/payload.py）：
+   `frameRate / global{prompt,taskType,refs,refAudios,refVideos} /
+   output{continuityEnabled,continuityOverlapFrames,audioMode,runSelection} /
+   runSelectEnabled / segments[{id,durationSec,frameCount,prompt,taskType,
+   refs,refAudios,refVideos,genImage}] / shots / video / videoClips`。
+   注意：后端只要 `shots` 非空就无视 `segments`——fl2v 之外的模式序列化时
+   shots 必须为空数组。
+9. **时长/帧网格**：用户秒数 → 17k+5 帧网格（`util.setDuration`，上限 512 帧）。
+   视频模式（v2v/rv2v）的段不参与网格规范化（start/length 由 video.js 精确
+   维护，套网格会让帧数与源区间漂移）。
+10. **缓存状态体**（/h3_scenedirector/status）从刚序列化的 JSON 构建，
+    字段与 make_list 产出的行一一对应（含 r2v 序列化时合入每段的公共音/视）。
+11. **存档兼容**：load 时必须规范化旧存档——Director 时代的段可能没有
+    `durationSec`（只有 start/length/frameCount），直接用会崩渲染
+    （"死了 prompt"事故：渲染崩在半路，编辑不落进段）。
 
-## 四、皮肤与增量层
+## 四、分层与工程
 
-10. **皮肤只走 h3sd_theme.css**，所有覆盖选择器加 `.mmx-host` 前缀抬优先级
-    （Director 把 `<style>` 注入节点根、创建时才插入，同优先级后插入者胜）。
-11. 新 UI 组件只准放在独立文件（`h3sd_*.js`），挂载点用 Director 现有 DOM；
-    对 Director 的元素**只隐藏（classList toggle）不删除**，模式切走时要能还原。
-12. **`minimax_*.js` 主文件不许改**（fork 自 Director，保持可比对/可升级）。
-    例外修补必须单独注明原因并记录在本文件下方"已破例清单"。
-
-## 已破例清单
-
-- minimax_timeline.js:1023–1030：增强面板挂载（上游此版本为死导出，不接不显示）。
-- minimax_timeline.js 的 i18n 中文化与 H3SceneDirectorList 节点名认领。
+12. 组件只碰 store 与后端通道（api），不感知节点内部；渲染按模式路由
+    （cards.js 批量系 / video.js 视频系），v2v/rv2v 不挂胶片带。
+13. WS 监听、定时器一律在 onRemoved 退订/清理（extras.dispose）。
+14. 皮肤集中在 skin.css，类名 `sd2-*`、作用域 `.mmx-host`。

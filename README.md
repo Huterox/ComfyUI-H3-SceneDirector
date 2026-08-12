@@ -28,21 +28,21 @@ model / sampler / sigmas 全部走接线，Spectrum 等加速节点即插即用�
 - **色彩双层一致性**：全片逐帧滑动校色 color_lock（治漂移）+ 接缝亮度渐变
   （治接口跳变）+ 接缝回声诊断
 - **级联失效缓存 + 选择运行**：改哪段只烧哪段之后；勾选段渲染、未选段缓存填充
-- **工作台 UI**：时间轴拖缘调时长/拖拽换序/分割、段勾选、资产卡（图/视频/音频）、
-  场景设定表、逐步实时预览、进度条、@引用补全、中英 i18n
+- **工作台 UI**（v2 自研前端）：六模式页签、批量提示词组卡、fl2v 镜组卡、
+  r2v 公共参数面板（图/音/视分类）、v2v 舞台播放器+段时间轴（拖缘调区间/
+  智能分割/均分/追加视频）、缓存胶片带（绿/橙/红状态点+点播）、实时预览、
+  状态行进度条、@引用补全、每段魔法棒 LLM 扩写（内联预览-确认-应用）
 - **智能分镜**：零依赖帧差切点检测（PyAV），一键把源视频切成 v2v 段
-- **LLM 提示词增强**：Ollama / OpenAI 兼容端点，按任务类型的模板
+- **LLM 提示词增强**：OpenAI 兼容 / Anthropic 端点，按任务类型的官方模板，
+  配置随工作流持久化
 - **段间 VRAM 清理**（可选）：显存吃紧时换稳定
 
 ## 示例工作流（example_workflows/）
 
 | 文件 | 说明 |
 |---|---|
-| `scenedirector_workbench.json` | 全能工作台：任务模式在工作台段卡片里按段选择（t2v/i2v/fl2v/r2v/v2v/rv2v）；r2v/v2v/rv2v 时把 UNETLoader 文件换成 ref2va |
-| `scenedirector_workbench_spec.json` | 同款 + Spectrum 加速节点 |
-
-示例提示词与 Director 示例对齐；占位素材（`subject.png`/`source.mp4`/
-`fl2v_first.png`/`fl2v_last.png`）需自行替换到输入目录。
+| `场景导演工作台.json` | 全能工作台：任务模式页签切换（t2v/i2v/fl2v/r2v/v2v/rv2v）；r2v/v2v/rv2v 自动联动 UNET 为 ref2va |
+| `场景导演工作台_Spec加速.json` | 同款 + Spectrum 加速节点（UNETLoader→Spectrum→Chain/Scheduler） |
 
 ## 模型
 
