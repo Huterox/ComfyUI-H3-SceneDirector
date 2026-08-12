@@ -364,6 +364,13 @@ export function attachWorkbench(node, { app, api }) {
         progress.onDone();
     });
 
+    // 队列序列化前把防抖中的编辑落盘（打字后立刻点运行不丢尾字）
+    const origNodeSerialize = node.onSerialize;
+    node.onSerialize = function () {
+        try { store.flush(); } catch (e) { /* 忽略 */ }
+        return origNodeSerialize?.apply(this, arguments);
+    };
+
     function dispose() {
         offProgress();
         offStep();
