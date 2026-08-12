@@ -9,13 +9,16 @@ import logging
 import time
 
 import comfy.model_management as mm
+from comfy.internal_logging import DETAIL
 from server import PromptServer
 
 LOG_EVENT = "h3_scenedirector_log"
 
-# 桥接白名单：模型装卸与任务生命周期（INFO 级；detail/DEBUG 级收不到也不追）
-_BRIDGE_KEYS = ("Requested to load", "models unloaded", "got prompt",
-                "Prompt executed")
+# 桥接白名单：模型装卸与任务生命周期。"Model loaded"/"AIMDO free" 是
+# DETAIL(15) 级（装载明细：RAM/VRAM 占用、vbar 释放量），装桥时把 root
+# 放到 DETAIL 让我们能收到；其余 handler 提到 INFO，控制台不刷屏。
+_BRIDGE_KEYS = ("Requested to load", "Model loaded", "models unloaded",
+                "AIMDO free", "got prompt", "Prompt executed")
 
 _last = {"msg": None}
 
@@ -59,11 +62,18 @@ class _ComfyBridge(logging.Handler):
 
 
 def install_bridge():
-    """root logger 挂桥（幂等；模块 import 即生效）。"""
+    """root logger 挂桥（幂等；模块 import 即生效）。
+
+    root 降到 DETAIL(15)——只多放行 DETAIL 级，DEBUG(10) 仍被挡在外；
+    其余 handler（控制台）提到 INFO，明细只进前端日志条，不刷终端。"""
     root = logging.getLogger()
-    if any(isinstance(h, _ComfyBridge) for h in root.handlers):
-        return
-    root.addHandler(_ComfyBridge(logging.INFO))
+    if not any(isinstance(h, _ComfyBridge) for h in root.handlers):
+        root.addHandler(_ComfyBridge(DETAIL))
+    for h in root.handlers:
+        if not isinstance(h, _ComfyBridge) and (h.level == 0 or h.level < logging.INFO):
+            h.setLevel(logging.INFO)
+    if root.level == 0 or root.level > DETAIL:
+        root.setLevel(DETAIL)
 
 
 install_bridge()

@@ -421,7 +421,8 @@ def _d_frame_ref(item):
 
 
 def parse_run_options(raw):
-    """run 级可选覆盖：continuity / context_length / audio_mode。
+    """run 级可选覆盖：continuity / context_length / audio_mode /
+    color_lock / luma_lock。
     工作台（Director UI）写进载荷的控制项；None = 跟随 Chain 节点 widget。"""
     try:
         data = json.loads(raw or "{}")
@@ -431,6 +432,8 @@ def parse_run_options(raw):
         data = {}
     cont = data.get("continuity", None)
     ctx = data.get("context_length", None)
+    cl = data.get("color_lock", None)
+    ll = data.get("luma_lock", None)
     try:
         ctx = int(ctx) if ctx is not None else None
     except (TypeError, ValueError):
@@ -440,6 +443,8 @@ def parse_run_options(raw):
         "continuity": None if cont is None else bool(cont),
         "context_length": ctx,
         "audio_mode": am if am in AUDIO_MODES else None,
+        "color_lock": None if cl is None else bool(cl),
+        "luma_lock": None if ll is None else bool(ll),
     }
 
 
@@ -447,7 +452,8 @@ def parse_director(timeline_data, task_type, global_prompt, run):
     """把 Director UI 的 timeline_data(v4) 翻译成载荷段列表。
 
     返回 (global_prompt_out, assets, segments, options)。
-    options = {"continuity","context_length","audio_mode"}（同 parse_run_options）。
+    options = {"continuity","context_length","audio_mode",
+               "color_lock","luma_lock"}（同 parse_run_options）。
     """
     try:
         tl = json.loads(timeline_data or "{}")
@@ -562,5 +568,7 @@ def parse_director(timeline_data, task_type, global_prompt, run):
         "context_length": (min(39, int(out.get("continuityOverlapFrames")))
                            if out.get("continuityOverlapFrames") else None),
         "audio_mode": am if am in AUDIO_MODES else None,
+        "color_lock": bool(out.get("colorLock")) if "colorLock" in out else None,
+        "luma_lock": bool(out.get("lumaLock")) if "lumaLock" in out else None,
     }
     return gp, assets, segments, options

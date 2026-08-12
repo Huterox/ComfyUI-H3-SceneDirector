@@ -40,7 +40,8 @@ from . import cache as C
 from .conditioning import (build_cond, load_ref_image, encode_video_ref,
                            encode_asset_refs, MAX_REFS)
 from .colorlock import (stats as cl_stats, match_smooth as cl_match,
-                        opening_luma_blend, seam_echo_count)
+                        opening_luma_blend, seam_echo_count,
+                        luma_of as cl_luma_of, luma_match as cl_luma_match)
 from . import plan as PL
 from . import vram as VRAM
 from . import budget as B
@@ -294,7 +295,7 @@ def run_chain(model, vae, audio_vae, segments_raw, story_cond, sampler, sigmas,
               encode_mode, anchor_mode, audio_mode, crop, cfg, cache_tag,
               uniform_window=False, color_lock=False, negative=None,
               continuity=True, seam_blend=True, vram_cleanup=False, node_id=None,
-              vram_budget=True):
+              vram_budget=True, luma_lock=False):
     """链条主循环：缓存命中段直接解码，自第一个变动段起级联重渲；
     未勾选段（选择运行关闭）走缓存填充。返回 (images, audio, contact_sheet, info)。
 
@@ -309,6 +310,10 @@ def run_chain(model, vae, audio_vae, segments_raw, story_cond, sampler, sigmas,
         continuity = opts["continuity"]
     if opts["context_length"] is not None:
         context_length = max(1, min(39, opts["context_length"]))
+    if opts["color_lock"] is not None:
+        color_lock = opts["color_lock"]
+    if opts["luma_lock"] is not None:
+        luma_lock = opts["luma_lock"]
     run_audio_mode = opts["audio_mode"]
     run, run_nonce, global_prompt, globals_rows, assets, segs = P.parse_payload(segments_raw)
     if not segs:
@@ -531,6 +536,14 @@ def run_chain(model, vae, audio_vae, segments_raw, story_cond, sampler, sigmas,
             else:
                 out_imgs = cl_match(out_imgs, *cl_ref)
 
+        # 亮度锁定（Director 同款思路）：逐段平均亮度归一到第 1 段，
+        # 只做整体亮度缩放，不动色相——与颜色锁定互补，可独立开关。
+        if luma_lock:
+            if i == 0:
+                luma_ref = cl_luma_of(out_imgs)
+            else:
+                out_imgs = cl_luma_match(out_imgs, luma_ref)
+
         # 接缝互补（第二层）：开头几帧亮度向上一段尾巴渐变，消除接口跳变；
         # 回声帧只做诊断日志。仅在本段用了链条衔接时才有意义
         used_cont = (not cached_hit) and trim > 0
@@ -545,9 +558,10 @@ def run_chain(model, vae, audio_vae, segments_raw, story_cond, sampler, sigmas,
 
         base = "seg_%04d" % (i + 1)
         if cached_hit:
-            # 命中段缺了可看工件就补上，不动 latent；校色开关与缓存
-            # 状态不一致时重存可看工件（校色不动 latent，无需重渲）
-            refresh = i > 0 and bool(meta.get("color_lock")) != bool(color_lock)
+            # 命中段缺了可看工件就补上，不动 latent；校色/亮度开关与缓存
+            # 状态不一致时重存可看工件（两者不动 latent，无需重渲）
+            refresh = i > 0 and (bool(meta.get("color_lock")) != bool(color_lock)
+                                 or bool(meta.get("luma_lock")) != bool(luma_lock))
             if refresh or not os.path.isfile(os.path.join(rd, "posters", base + ".jpg")):
                 C.save_segment(rd, i, None, out_imgs, out_aud, poster_only=True)
             if refresh or not os.path.isfile(os.path.join(rd, base + ".mp4")):
@@ -576,6 +590,8 @@ def run_chain(model, vae, audio_vae, segments_raw, story_cond, sampler, sigmas,
             tag = "缓存·未勾选"
         if color_lock and i > 0:
             tag += "·校色"
+        if luma_lock and i > 0:
+            tag += "·亮度"
         info_lines.append(
             "段 %d [%s]: %d 帧 / %.2fs, seed %d, trim %d, 音画漂移 %.1fms [%s]"
             % (i + 1, sp.task, frames, frames / float(P.FPS), seg_seed, trim,
@@ -584,9 +600,10 @@ def run_chain(model, vae, audio_vae, segments_raw, story_cond, sampler, sigmas,
 
     meta_out = C.new_meta(run, g_hash, global_prompt, globals_rows,
                           P.assets_fp(assets), base_seed, seg_meta)
-    # 记录校色开关状态：缓存段的可看工件是按这个状态落盘的，
+    # 记录校色/亮度开关状态：缓存段的可看工件是按这个状态落盘的，
     # 下次开关翻转时据此重存工件（不动 latent，不重渲）
     meta_out["color_lock"] = bool(color_lock)
+    meta_out["luma_lock"] = bool(luma_lock)
     C.save_meta(rd, meta_out)
 
     # 完成事件：这版 ComfyUI 已没有 execution_end（改名 execution_success），

@@ -74,6 +74,27 @@ def _luma(frame):
     return 0.299 * f[..., 0] + 0.587 * f[..., 1] + 0.114 * f[..., 2]
 
 
+def luma_of(images):
+    """整段平均亮度（Rec.601）。images: [T,H,W,C] 浮点 [0,1]。"""
+    return float(_luma(images).mean().item())
+
+
+def luma_match(images, ref_luma, ratio_clamp=(0.55, 1.8)):
+    """整段平均亮度按比例归一到参考值（Director 同款思路的我们的实现）：
+    只做整体亮度缩放，不动色相、不动对比度结构——与 color_lock 的
+    均值/方差通道匹配互补（那个连色偏一起修，这个只稳亮度）。
+
+    参考取第 1 段的交付亮度（链式参考会累积漂移）；ratio 夹在
+    [0.55, 1.8] 防内容差异被误当漂移硬拉；变化不足 1% 不动。"""
+    cur = luma_of(images)
+    if cur < 1e-4:
+        return images
+    ratio = max(ratio_clamp[0], min(ratio_clamp[1], float(ref_luma) / cur))
+    if abs(ratio - 1.0) < 0.01:
+        return images
+    return (images * ratio).clamp(0.0, 1.0)
+
+
 def opening_luma_blend(images, prev_tail, k=4, strength=0.85, ratio_clamp=(0.8, 1.25)):
     """开头亮度向上一段尾巴渐变对齐：本段前 k 帧按线性衰减权重把亮度
     拉向上一段末帧亮度，只调亮度不改内容。

@@ -33,6 +33,7 @@ function defaultState(taskLabel) {
         output: { aspectRatio: "16:9 (宽屏)", megapixels: 1.0,
                   continuityEnabled: true, continuityOverlapFrames: 22,
                   audioMode: "generate", exportMode: "all",
+                  colorLock: false, lumaLock: false,
                   // 模型联动（输出条可配，随工作流保存）
                   modelGen: "minimax_h3_fl2va_pruned_int8_convrot.safetensors",
                   modelRef: "minimax_h3_ref2va_pruned_int8_convrot.safetensors" },

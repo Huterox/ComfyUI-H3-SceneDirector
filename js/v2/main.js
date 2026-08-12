@@ -222,6 +222,20 @@ function buildSkeleton(ed) {
     contLbl.appendChild(document.createTextNode(" 段间引导"));
     contLbl.title = "开启：上一段尾帧+音频 latent 钉入下一段（特征上下文窗口衔接）";
     out.appendChild(contLbl);
+    const mkChk = (label, key, tip) => {
+        const lb = el("label", "lbl chk");
+        const ck = document.createElement("input");
+        ck.type = "checkbox"; ck.checked = !!o()[key];
+        ck.addEventListener("change", () => { o()[key] = ck.checked; ed.store.commit(); });
+        lb.appendChild(ck);
+        lb.appendChild(document.createTextNode(" " + label));
+        lb.title = tip;
+        return lb;
+    };
+    out.appendChild(mkChk("色彩一致", "colorLock",
+        "全片逐帧校色：整段均值/方差对齐第 1 段，压制逐段渲染的白平衡/曝光漂移（光照需要渐变的片子别开）"));
+    out.appendChild(mkChk("亮度一致", "lumaLock",
+        "逐段平均亮度归一到第 1 段（Rec.601，比例夹 0.55–1.8）：只稳亮度，不动色相与对比度结构"));
     out.appendChild(el("span", "lbl", "上下文帧数"));
     const ctxN = el("input", "sd2-inp num");
     ctxN.type = "number"; ctxN.min = "5"; ctxN.max = "39"; ctxN.value = o().continuityOverlapFrames;
