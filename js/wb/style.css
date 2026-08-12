@@ -43,7 +43,7 @@
 
 /* ---------- 预览区 ---------- */
 .h3wb-stage { display: flex; gap: 12px; padding: 12px; flex: none; }
-.h3wb-screen { width: 46%; aspect-ratio: 16/9; background: #000;
+.h3wb-screen { width: 46%; max-width: 440px; aspect-ratio: 16/9; background: #000;
     border: 1px solid var(--line); border-radius: 6px; overflow: hidden;
     position: relative; flex: none; }
 .h3wb-screen img, .h3wb-screen video { width: 100%; height: 100%;
@@ -204,37 +204,39 @@
 /* ---------- 等比缩放层（容器查询单位：1cqw = 工作台宽度的 1%） ----------
    用户要的真·等比：组件尺寸随节点宽度线性伸缩。不用 zoom（渲染会被
    前端布局甩出节点），也不用 JS 逐件换算——cqw 由 CSS 在容器内
-   自行解析，永不溢出。基准 = 设计稿 920px 宽（该处 1cqw ≈ 9.2px）。 */
+   自行解析，永不溢出。基准 = 设计稿 920px 宽（该处 1cqw ≈ 9.2px）。
+   v3.2：全部套 min() 钳制——窄节点同比缩小，宽过设计稿就停止生长，
+   节点拉再宽组件也不会变成巨无霸。 */
 .h3wb { container-type: inline-size; }
 .h3wb-bar, .h3wb-status, .h3wb-btn, .h3wb-run, .h3wb-durinput, .h3wb-fold,
-.h3wb-dside, .h3wb-setrow, .h3wb-cards, .h3wb-acts { font-size: 1.30cqw; }
-.h3wb-empty { font-size: 1.41cqw; }
-.h3wb-segadd { font-size: 2.17cqw; }
-.h3wb-pinadd { font-size: 1.74cqw; }
-.h3wb-x { font-size: 1.52cqw; }
-.h3wb-bar { padding: 0.87cqw 1.30cqw; }
-.h3wb-run { width: 16.3cqw; padding: 0.33cqw 0.87cqw; }
-.h3wb-btn { padding: 0.33cqw 1.09cqw; }
-.h3wb-stage { padding: 1.30cqw; gap: 1.30cqw; }
-.h3wb-segtitle { font-size: 1.52cqw; }
-.h3wb-tag { font-size: 1.20cqw; }
-.h3wb-play span { width: 4.78cqw; height: 4.78cqw; font-size: 1.74cqw; }
-.h3wb-zoom { width: 2.83cqw; height: 2.83cqw; font-size: 1.52cqw; }
-.h3wb-livetag { font-size: 1.09cqw; }
-.h3wb-ruler { font-size: 1.09cqw; height: 1.96cqw; }
-.h3wb-seg { height: 10.43cqw; }
-.h3wb-segno, .h3wb-segdur { font-size: 1.09cqw; }
-.h3wb-seg-empty { font-size: 1.20cqw; }
-.h3wb-prompt { font-size: 1.25cqw; }
-.h3wb-label { font-size: 1.20cqw; }
-.h3wb-hint, .h3wb-kv { font-size: 1.20cqw; }
-.h3wb-card { width: 16.3cqw; }
-.h3wb-card-cat, .h3wb-card-name, .h3wb-card-note { font-size: 1.20cqw; }
-.h3wb-card-nothumb { font-size: 1.09cqw; }
-.h3wb-pord { font-size: 1.09cqw; }
-.h3wb-pin, .h3wb-pinadd { width: 4.78cqw; height: 4.78cqw; }
-.h3wb-thumbmenu button { font-size: 1.20cqw; }
-.h3wb-fold summary, .h3wb-sec-label { font-size: 1.20cqw; }
+.h3wb-dside, .h3wb-setrow, .h3wb-cards, .h3wb-acts { font-size: min(12px, 1.30cqw); }
+.h3wb-empty { font-size: min(13px, 1.41cqw); }
+.h3wb-segadd { font-size: min(20px, 2.17cqw); }
+.h3wb-pinadd { font-size: min(16px, 1.74cqw); }
+.h3wb-x { font-size: min(14px, 1.52cqw); }
+.h3wb-bar { padding: min(8px, 0.87cqw) min(12px, 1.30cqw); }
+.h3wb-run { width: min(150px, 16.3cqw); padding: min(3px, 0.33cqw) min(8px, 0.87cqw); }
+.h3wb-btn { padding: min(3px, 0.33cqw) min(10px, 1.09cqw); }
+.h3wb-stage { padding: min(12px, 1.30cqw); gap: min(12px, 1.30cqw); }
+.h3wb-segtitle { font-size: min(14px, 1.52cqw); }
+.h3wb-tag { font-size: min(11px, 1.20cqw); }
+.h3wb-play span { width: min(44px, 4.78cqw); height: min(44px, 4.78cqw); font-size: min(16px, 1.74cqw); }
+.h3wb-zoom { width: min(26px, 2.83cqw); height: min(26px, 2.83cqw); font-size: min(14px, 1.52cqw); }
+.h3wb-livetag { font-size: min(10px, 1.09cqw); }
+.h3wb-ruler { font-size: min(10px, 1.09cqw); height: min(18px, 1.96cqw); }
+.h3wb-seg { height: min(96px, 10.43cqw); }
+.h3wb-segno, .h3wb-segdur { font-size: min(10px, 1.09cqw); }
+.h3wb-seg-empty { font-size: min(11px, 1.20cqw); }
+.h3wb-prompt { font-size: min(12px, 1.25cqw); }
+.h3wb-label { font-size: min(11px, 1.20cqw); }
+.h3wb-hint, .h3wb-kv { font-size: min(11px, 1.20cqw); }
+.h3wb-card { width: min(150px, 16.3cqw); }
+.h3wb-card-cat, .h3wb-card-name, .h3wb-card-note { font-size: min(11px, 1.20cqw); }
+.h3wb-card-nothumb { font-size: min(10px, 1.09cqw); }
+.h3wb-pord { font-size: min(10px, 1.09cqw); }
+.h3wb-pin, .h3wb-pinadd { width: min(44px, 4.78cqw); height: min(44px, 4.78cqw); }
+.h3wb-thumbmenu button { font-size: min(11px, 1.20cqw); }
+.h3wb-fold summary, .h3wb-sec-label { font-size: min(11px, 1.20cqw); }
 .h3wb-topwrap { flex: none; }
 .h3wb-topwrap.sized { overflow-y: auto; }
 .h3wb-vsplit { width: 8px; flex: none; cursor: col-resize; border-radius: 4px; }
