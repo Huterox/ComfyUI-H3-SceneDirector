@@ -11,7 +11,7 @@
 //     段与 clip 1:1（后端 clip = clips[min(i, len-1)]），追加视频后
 //     不能再智能分割/均分（后端只看 clip 整段范围）；
 //   * 段的 frameCount = length、durationSec = length/24（输出时长跟随源区间）。
-import { el, fmtTime, viewURL, splitRel, uploadImage, refThumbURL } from "./util.js";
+import { el, fmtTime, viewURL, splitRel, uploadImage, refThumbURL, lightbox } from "./util.js";
 
 const TL_FPS = 24;   // 时间轴帧率（parse_director 用 tl.frameRate=24 换算秒）
 
@@ -447,6 +447,7 @@ export function createVideoEditor(ed, { api }) {
     function segRefSlot(refList, index) {
         const ref = refList.find((r) => Number(r.index) === index && r.imageFile);
         const slot = el("div", "sd2-ref" + (ref ? " has" : ""));
+        let clickTimer = 0;
         if (ref) {
             const img = document.createElement("img");
             img.src = refThumbURL(api, ref);
@@ -455,32 +456,43 @@ export function createVideoEditor(ed, { api }) {
             const x = el("u", "x", "×");
             x.addEventListener("click", (e) => {
                 e.stopPropagation();
+                clearTimeout(clickTimer);
                 refList.splice(refList.indexOf(ref), 1);
                 store.commit({ structural: true });
             });
             slot.appendChild(x);
+            slot.title = "点击更换；双击放大";
         } else {
             slot.textContent = "图片" + (index + 1);
         }
         slot.addEventListener("click", () => {
-            const inp = document.createElement("input");
-            inp.type = "file";
-            inp.accept = "image/*";
-            inp.style.display = "none";
-            inp.addEventListener("change", async () => {
-                const f = inp.files && inp.files[0];
-                inp.remove();
-                if (!f) return;
-                const info = await uploadImage(api, f);
-                const rel = info.subfolder ? info.subfolder + "/" + info.name : info.name;
-                const old = refList.find((r) => Number(r.index) === index);
-                if (old) old.imageFile = rel;
-                else refList.push({ index, imageFile: rel });
-                store.commit({ structural: true });
-            });
-            document.body.appendChild(inp);
-            inp.click();
+            clearTimeout(clickTimer);
+            clickTimer = setTimeout(() => {
+                const inp = document.createElement("input");
+                inp.type = "file";
+                inp.accept = "image/*";
+                inp.style.display = "none";
+                inp.addEventListener("change", async () => {
+                    const f = inp.files && inp.files[0];
+                    inp.remove();
+                    if (!f) return;
+                    const info = await uploadImage(api, f);
+                    const rel = info.subfolder ? info.subfolder + "/" + info.name : info.name;
+                    const old = refList.find((r) => Number(r.index) === index);
+                    if (old) old.imageFile = rel;
+                    else refList.push({ index, imageFile: rel });
+                    store.commit({ structural: true });
+                });
+                document.body.appendChild(inp);
+                inp.click();
+            }, 260);
         });
+        if (ref) {
+            slot.addEventListener("dblclick", () => {
+                clearTimeout(clickTimer);
+                lightbox(refThumbURL(api, ref), false);
+            });
+        }
         return slot;
     }
 

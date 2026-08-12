@@ -37,6 +37,7 @@ export function createCards(ed, { api }) {
     function refSlot(refList, index, onChange) {
         const ref = refList.find((r) => Number(r.index) === index && r.imageFile);
         const slot = el("div", "sd2-ref" + (ref ? " has" : ""));
+        let clickTimer = 0;
         if (ref) {
             const img = document.createElement("img");
             img.src = refThumbURL(api, ref);
@@ -47,26 +48,36 @@ export function createCards(ed, { api }) {
             x.title = "清除这张图";
             x.addEventListener("click", (e) => {
                 e.stopPropagation();
+                clearTimeout(clickTimer);
                 const i = refList.indexOf(ref);
                 if (i >= 0) refList.splice(i, 1);
                 onChange();
             });
             slot.appendChild(x);
             slot.title = "点击更换；双击放大";
-            slot.addEventListener("dblclick", () => lightbox(refThumbURL(api, ref), false));
         } else {
             slot.textContent = "图片" + (index + 1);
             slot.title = "点击上传参考图（也可直接拖图进来）";
         }
-        slot.addEventListener("click", () => filePicker(async (f) => {
-            try {
-                const rel = await doUpload(f);
-                const old = refList.find((r) => Number(r.index) === index);
-                if (old) old.imageFile = rel;
-                else refList.push({ index, imageFile: rel });
-                onChange();
-            } catch (err) { console.error("[sd2] 上传失败", err); }
-        }));
+        // 单击延迟 260ms 打开文件选择；双击取消单击并放大（否则先弹文件框挡住灯箱）
+        slot.addEventListener("click", () => {
+            clearTimeout(clickTimer);
+            clickTimer = setTimeout(() => filePicker(async (f) => {
+                try {
+                    const rel = await doUpload(f);
+                    const old = refList.find((r) => Number(r.index) === index);
+                    if (old) old.imageFile = rel;
+                    else refList.push({ index, imageFile: rel });
+                    onChange();
+                } catch (err) { console.error("[sd2] 上传失败", err); }
+            }), 260);
+        });
+        if (ref) {
+            slot.addEventListener("dblclick", () => {
+                clearTimeout(clickTimer);
+                lightbox(refThumbURL(api, ref), false);
+            });
+        }
         slot.addEventListener("dragover", (e) => { e.preventDefault(); slot.classList.add("drop"); });
         slot.addEventListener("dragleave", () => slot.classList.remove("drop"));
         slot.addEventListener("drop", (e) => {
@@ -88,6 +99,7 @@ export function createCards(ed, { api }) {
     // 16:9 图槽（i2v 源图 / fl2v 首尾帧）：obj = {imageFile}
     function frameSlot(obj, label, onChange) {
         const slot = el("div", "sd2-frame" + (obj.imageFile ? " has" : ""));
+        let clickTimer = 0;
         if (obj.imageFile) {
             const img = document.createElement("img");
             img.src = refThumbURL(api, obj);
@@ -97,20 +109,30 @@ export function createCards(ed, { api }) {
             x.title = "清除";
             x.addEventListener("click", (e) => {
                 e.stopPropagation();
+                clearTimeout(clickTimer);
                 obj.imageFile = "";
                 onChange();
             });
             slot.appendChild(x);
-            slot.addEventListener("dblclick", () => lightbox(refThumbURL(api, obj), false));
+            slot.title = "点击更换；双击放大";
         } else {
             slot.innerHTML = label + "<br>点击上传";
         }
-        slot.addEventListener("click", () => filePicker(async (f) => {
-            try {
-                obj.imageFile = await doUpload(f);
-                onChange();
-            } catch (err) { console.error("[sd2] 上传失败", err); }
-        }));
+        slot.addEventListener("click", () => {
+            clearTimeout(clickTimer);
+            clickTimer = setTimeout(() => filePicker(async (f) => {
+                try {
+                    obj.imageFile = await doUpload(f);
+                    onChange();
+                } catch (err) { console.error("[sd2] 上传失败", err); }
+            }), 260);
+        });
+        if (obj.imageFile) {
+            slot.addEventListener("dblclick", () => {
+                clearTimeout(clickTimer);
+                lightbox(refThumbURL(api, obj), false);
+            });
+        }
         return slot;
     }
 
@@ -267,7 +289,8 @@ export function createCards(ed, { api }) {
         const s = ed.store.get();
         const mode = ed.store.mode();
         const isR2v = mode === "r2v";
-        const isI2v = mode === "i2v";
+        // i2v/r2v 都显示首帧槽（r2v 可用首帧做锚定；后端 genImage 全任务可读）
+        const showFirstFrame = mode === "i2v" || isR2v;
         const picOff = (s.global.refs || []).length;
         const maxSlots = Math.max(1, 9 - picOff);
 
@@ -328,9 +351,9 @@ export function createCards(ed, { api }) {
         card.appendChild(head);
 
         const row = el("div", "sd2-card-row");
-        if (isI2v) {
+        if (showFirstFrame) {
             const col = el("div", "sd2-framesrc");
-            col.appendChild(el("span", "lbl", "源图（首帧）"));
+            col.appendChild(el("span", "lbl", isR2v ? "首帧（可选锚定）" : "源图（首帧）"));
             col.appendChild(frameSlot(seg.genImage, "源图",
                 () => ed.store.commit({ structural: true })));
             row.appendChild(col);
