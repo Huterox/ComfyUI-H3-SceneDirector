@@ -127,7 +127,11 @@ function refToCard(ref) {
     const rel = String(ref?.imageFile || ref?.fileName || "").trim().replace(/\\/g, "/");
     if (!rel) return null;
     let sub = "", name = rel;
-    if (rel.includes("/")) [sub, name] = rel.rsplit("/", 1);
+    const cut = rel.lastIndexOf("/");
+    if (cut >= 0) {
+        sub = rel.slice(0, cut);
+        name = rel.slice(cut + 1);
+    }
     return { image: name, subfolder: sub || "", rel };
 }
 

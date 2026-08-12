@@ -86,6 +86,10 @@ function polish(node) {
             });
             mk("丢弃", "h3sd-btn danger", hide);
             pe.body?.insertBefore(box, pe.body.firstChild);
+            // 两根大渐变按钮（内联样式 #3b82f6/#6366f1 全宽条）收进我们的
+            // 视觉体系：打类名，颜色交给 h3sd_theme.css（!important 压内联）
+            pe.enhanceCurrentBtn?.classList.add("h3sd-pe-btn", "cur");
+            pe.enhanceAllBtn?.classList.add("h3sd-pe-btn", "all");
             if (origApply) {
                 pe.setActivePromptText = (text) => {
                     if (pe._h3sdPreviewNext) {

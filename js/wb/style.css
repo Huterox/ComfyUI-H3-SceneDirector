@@ -9,9 +9,10 @@
     background: var(--bg); color: var(--text);
     font: 12px/1.5 "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
     border-radius: 8px; overflow: hidden;
-    /* v3：作为 Director bd-main 的弹性孩子（占批量卡面板原来的位置），
-       高度跟着节点走，保底一个可用高度；中间滚动区自己滚。 */
-    flex: 1 1 auto;
+    /* v3.1：高度必须拿满父容器（Director bd-main 在 batch-fill 模式下
+       会把节点剩余高度分给它），滚动区才有定高、详情/折叠区才不会塌；
+       父容器没定高时 100% 退化为内容高，各区自然堆叠也不会塌。 */
+    height: 100%;
     min-height: 560px;
     display: flex; flex-direction: column;
 }
@@ -19,6 +20,8 @@
 .h3wb button { font: inherit; cursor: pointer; }
 .h3wb input, .h3wb textarea, .h3wb select { font: inherit; color: var(--text); }
 .h3wb-scroll { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
+/* 父容器没给出定高时 flex:1 会把滚动区算塌，给一个内容保底 */
+.h3wb-root > .h3wb-scroll, .h3wb > .h3wb-scroll { min-height: 220px; }
 .h3wb-scroll::-webkit-scrollbar { width: 8px; }
 .h3wb-scroll::-webkit-scrollbar-thumb { background: #3a3a3d; border-radius: 4px; }
 

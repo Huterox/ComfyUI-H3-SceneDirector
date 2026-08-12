@@ -496,3 +496,18 @@
 .h3sd-pe-preview-btns button:hover { background: #2b3040; }
 .h3sd-pe-preview-btns .h3sd-btn-primary { background: #2e6fd8; border-color: #2e6fd8; color: #fff; }
 .h3sd-pe-preview-btns .danger { color: #ff9d9d; }
+
+/* 增强器的两根全宽渐变按钮：压内联样式，换成我们的控件样 */
+.h3sd-pe-btn {
+    background: #232733 !important;
+    color: #cfd3dd !important;
+    border: 1px solid #333a4d !important;
+    font-weight: 500 !important;
+}
+.h3sd-pe-btn:hover { background: #2b3040 !important; }
+.h3sd-pe-btn.cur {
+    background: #2e6fd8 !important;
+    color: #fff !important;
+    border-color: #2e6fd8 !important;
+}
+.h3sd-pe-btn.cur:hover { background: #3b7fe8 !important; }
