@@ -66,8 +66,39 @@ function polish(node) {
             box.appendChild(head);
             box.appendChild(pre);
             box.appendChild(btns);
-            let pending = null;
+            let pending = null;   // {text, target: 段号 | "global" | undefined(当前段)}
             const hide = () => { box.classList.add("hidden"); pending = null; };
+            // 应用：带目标时精准写回（魔法棒路径），否则走原「当前段」路径。
+            // 契约第 8 条：写段数据后必须同步对应 textarea 的 DOM 值再 commit。
+            const applyTarget = (text, target) => {
+                if (target === "global") {
+                    ed.timeline.global = ed.timeline.global || {};
+                    ed.timeline.global.prompt = text;
+                    if (ed.globalPromptWidget) ed.globalPromptWidget.value = text;
+                    if (ed.globalPrompt) ed.globalPrompt.value = text;
+                    const ta = ed.root?.querySelector('[data-r="global-prompt-layout"] textarea');
+                    if (ta) { ta.value = text; ta.dispatchEvent(new Event("input")); }
+                    ed.commit?.(false, { syncTimeline: true });
+                    return;
+                }
+                if (Number.isInteger(target)) {
+                    pe.setPromptTextForBlock(text, target);
+                    const ta = ed.batchList?.querySelector(
+                        `textarea[data-batch-prompt-index="${target}"]`);
+                    if (ta) { ta.value = text; ta.dispatchEvent(new Event("input")); }
+                    const fl = ed.root?.querySelector('[data-r="fl2v-prompt"]');
+                    if (fl && target === (ed.selectedIndex ?? 0)) {
+                        fl.value = text; fl.dispatchEvent(new Event("input"));
+                    }
+                    if (ed.segPrompt && target === (ed.selectedIndex ?? 0)) {
+                        ed.segPrompt.value = text;
+                        ed.segPrompt.dispatchEvent(new Event("input"));
+                    }
+                    ed.commit?.(false, { syncTimeline: true });
+                    return;
+                }
+                applyText(text);   // 面板「扩写当前」原路径
+            };
             const mk = (label, cls, fn) => {
                 const b = document.createElement("button");
                 b.className = cls;
@@ -77,24 +108,33 @@ function polish(node) {
                 return b;
             };
             mk("应用", "h3sd-btn-primary", () => {
-                if (pending != null) applyText(pending);
+                if (pending) applyTarget(pending.text, pending.target);
                 hide();
             });
             mk("复制", "h3sd-btn", () => {
-                if (pending != null) navigator.clipboard?.writeText(pending);
+                if (pending) navigator.clipboard?.writeText(pending.text);
             });
             mk("丢弃", "h3sd-btn danger", hide);
             pe.body?.insertBefore(box, pe.body.firstChild);
             // 两根全宽渐变按钮（内联 #3b82f6/#6366f1）打类名交给主题
             pe.enhanceCurrentBtn?.classList.add("h3sd-pe-btn", "cur");
             pe.enhanceAllBtn?.classList.add("h3sd-pe-btn", "all");
+            // 魔法棒的预览入口（h3sd_wand.js 调）：带目标的预览
+            ed._h3sdShowPreview = (text, target) => {
+                pending = { text, target };
+                head.textContent = target === "global"
+                    ? "结果预览 · 全局提示词 · 确认后应用"
+                    : Number.isInteger(target)
+                        ? "结果预览 · 片段 " + (target + 1) + " · 确认后应用"
+                        : "结果预览 · 确认后应用";
+                pre.textContent = text;
+                box.classList.remove("hidden");
+            };
             if (origApply) {
                 pe.setActivePromptText = (text) => {
                     if (pe._h3sdPreviewNext) {
                         pe._h3sdPreviewNext = false;
-                        pending = text;
-                        pre.textContent = text;
-                        box.classList.remove("hidden");
+                        ed._h3sdShowPreview(text, undefined);
                         return;
                     }
                     return applyText(text);

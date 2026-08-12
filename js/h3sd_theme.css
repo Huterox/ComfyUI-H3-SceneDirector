@@ -579,3 +579,21 @@
     text-shadow: 0 1px 2px #000;
 }
 .h3sd-fs-rebuild { color: #9fd3ff !important; }
+
+/* ============ 分段魔法棒（h3sd_wand.js） ============ */
+.h3sd-wand {
+    margin-left: 6px;
+    background: #232733;
+    border: 1px solid #333a4d;
+    border-radius: 4px;
+    color: #9fd3ff;
+    font-size: 10px;
+    padding: 0 7px;
+    line-height: 1.7;
+    cursor: pointer;
+    vertical-align: middle;
+}
+.h3sd-wand:hover { background: #2b3040; border-color: #4da3ff; }
+.h3sd-wand:disabled { opacity: .5; cursor: default; }
+.h3sd-wand.busy { animation: h3sd-wand-pulse 1s ease-in-out infinite; }
+@keyframes h3sd-wand-pulse { 50% { opacity: .45; } }
