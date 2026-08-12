@@ -6,12 +6,29 @@
 //     首帧（i2v/r2v；点击上传、拖拽上传、× 清除、点击放大）/勾选运行/换序/删除；
 //   * 引用 chips 行（library.segRefChips）：本段挂载的按需卡，× 取消，@ 引用挂载；
 //   * 提示词框 @ 引用：选中 = 插锚点 + 挂载本段（v5「@ 引用即挂载」）；
-//   * 🪄 调 enhance.js，结果内联预览-确认-应用。
+//   * 🪄 对话改写：开/关 agentchat 面板（项目 agent 多轮改写，提案「应用此版」）。
 import { el, uploadImage, refThumbURL, lightbox, setDuration,
-         assetKey, numberAssets } from "./util.js";
+         assetKey, numberAssets, taskKeyFromLabel } from "./util.js";
 import { segRefChips } from "./library.js";
 
 export function createCards(ed, { api }) {
+
+    // 对话改写的目标描述（后端 compose_wand_message 的输入）
+    function chatTarget(key, name, getObj, taskKey) {
+        return () => {
+            const o = getObj();
+            return { key, name, task: taskKey(),
+                     duration: Number(o?.durationSec) || 5.0,
+                     text: o?.prompt || "" };
+        };
+    }
+
+    // 资产清单（带给 agent：知道有哪些 @键 可用，不发明新资产）
+    function assetBrief() {
+        return (ed.store.get().library || []).map((c) => ({
+            key: assetKey(c), kind: c.kind || "image", pinned: c.pinned !== false,
+        }));
+    }
 
     // --- 通用小件 -----------------------------------------------------------
 
@@ -190,15 +207,29 @@ export function createCards(ed, { api }) {
         }
         const body = el("div", "sd2-card-body");
         const chipsRef = segRefChips(ed, { api }, seg);
+        const segKey = "seg:" + i;
         body.appendChild(ed.promptbox.promptArea(
             () => seg.prompt,
             (v) => { seg.prompt = v; ed.store.commit(); },
             { wandTarget: i,
               mentionScope: () => mentionItems(() => seg),
-              onPick: onPickMount(seg, chipsRef) },
+              onPick: onPickMount(seg, chipsRef),
+              onWand: () => ed.agentchat?.toggle(segKey) },
         ));
-        const pv = ed.promptbox.previewBlock(i);
-        if (pv) body.appendChild(pv);
+        if (ed.agentchat?.isOpen(segKey)) {
+            body.appendChild(ed.agentchat.panel(segKey, {
+                name: "片段 " + (i + 1),
+                makeTarget: chatTarget(segKey, "片段 " + (i + 1),
+                    () => ed.store.get().segments[i],
+                    () => taskKeyFromLabel(ed.store.get().segments[i]?.taskType
+                        || ed.store.mode())),
+                assets: assetBrief,
+                apply: (v) => {
+                    const sg = ed.store.get().segments[i];
+                    if (sg) { sg.prompt = v; ed.store.commit({ structural: true }); }
+                },
+            }));
+        }
 
         // 时长 + 状态徽标
         const durRow = el("div", "sd2-durrow");
@@ -273,15 +304,27 @@ export function createCards(ed, { api }) {
 
         const body = el("div", "sd2-card-body");
         const chipsRef = segRefChips(ed, { api }, shot);
+        const shotKey = "shot:" + i;
         body.appendChild(ed.promptbox.promptArea(
             () => shot.prompt,
             (v) => { shot.prompt = v; ed.store.commit(); },
             { wandTarget: "shot:" + i,
               mentionScope: () => mentionItems(() => shot),
-              onPick: onPickMount(shot, chipsRef) },
+              onPick: onPickMount(shot, chipsRef),
+              onWand: () => ed.agentchat?.toggle(shotKey) },
         ));
-        const pv = ed.promptbox.previewBlock("shot:" + i);
-        if (pv) body.appendChild(pv);
+        if (ed.agentchat?.isOpen(shotKey)) {
+            body.appendChild(ed.agentchat.panel(shotKey, {
+                name: "镜 " + (i + 1),
+                makeTarget: chatTarget(shotKey, "镜 " + (i + 1),
+                    () => ed.store.get().shots[i], () => "fl2v"),
+                assets: assetBrief,
+                apply: (v) => {
+                    const sh = ed.store.get().shots[i];
+                    if (sh) { sh.prompt = v; ed.store.commit({ structural: true }); }
+                },
+            }));
+        }
         const durRow = el("div", "sd2-durrow");
         durRow.appendChild(el("span", "lbl", "本镜秒数"));
         const dur = el("input", "sd2-inp num");

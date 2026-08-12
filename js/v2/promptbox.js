@@ -1,39 +1,30 @@
-// promptbox.js —— 共享提示词组件：promptArea（轻量 commit + @引用 + 🪄）
-// 与 previewBlock（魔法棒结果内联预览-确认-应用 / 错误块）。
+// promptbox.js —— 共享提示词组件：promptArea（轻量 commit + @引用 + 🪄对话改写）。
 //
 // 从 cards.js 拆出（library/cards/video 三处都要用，避免循环依赖）。
 // @ 引用条目由调用方的 mentionScope() 提供：{label, insert, key, pinned}；
 // 选中时先替换文本插锚点，再回调 onPick(item)（调用方负责挂载 libRefs
 // 并局部刷新 chips——不走 structural commit，保住输入焦点）。
+// 🪄 按钮只做一件事：调 opts.onWand()（由 agentchat.js 开/关对话面板），
+// 自己不碰 LLM——改写是项目 agent 的多轮对话，不是一次性扩写。
 import { el } from "./util.js";
 
 export function createPromptBox(ed, { api }) {
 
     // 提示词框：轻量 commit + @引用 + 🪄
-    // opts: { wandTarget, mentionScope(), onPick(item) }
+    // opts: { wandTarget, mentionScope(), onPick(item), onWand() }
     function promptArea(getPrompt, setPrompt, opts = {}) {
-        const { wandTarget, mentionScope, onPick } = opts;
+        const { wandTarget, mentionScope, onPick, onWand } = opts;
         const wrap = el("div", "sd2-pwrap");
         const head = el("div", "sd2-phead");
         head.appendChild(el("span", "lbl", "提示词"));
-        if (wandTarget !== null && wandTarget !== undefined) {
-            const wand = el("button", "sd2-wand", "🪄 扩写");
+        if (wandTarget !== null && wandTarget !== undefined && onWand) {
+            const wand = el("button", "sd2-wand", "🪄 对话改写");
             wand.type = "button";
-            wand.title = "LLM 扩写这段提示词（配置见「服务配置」；结果先预览，确认才应用）";
-            wand.addEventListener("click", async (e) => {
+            wand.title = "项目 agent 对话改写这段提示词（多轮打磨，满意后点「应用此版」；"
+                + "LLM 配置见「服务配置」）";
+            wand.addEventListener("click", (e) => {
                 e.preventDefault();
-                if (wand.disabled) return;              // 防连点
-                wand.disabled = true;
-                const old = wand.textContent;
-                wand.textContent = "⏳ 扩写中…";
-                wand.classList.add("busy");
-                try {
-                    await ed.enhancer.enhanceTarget(wandTarget);
-                } finally {
-                    wand.disabled = false;
-                    wand.textContent = old;
-                    wand.classList.remove("busy");
-                }
+                onWand();
             });
             head.appendChild(wand);
         }
@@ -90,32 +81,5 @@ export function createPromptBox(ed, { api }) {
         return wrap;
     }
 
-    // 增强预览块（内联在卡里；ed.preview 由 enhance.js 写）。
-    // error 变体只给「丢弃」（扩写失败也走这条通道让人看见——
-    // 配置折叠面板已删，错误不能再被藏起来）。
-    function previewBlock(target) {
-        const p = ed.preview;
-        if (!p || p.target !== target) return null;
-        const box = el("div", "sd2-pv" + (p.error ? " err" : ""));
-        box.appendChild(el("div", "hd",
-            (p.error ? "⚠ " : "🪄 结果预览 · ") + p.name + (p.error ? "" : " · 确认后应用")));
-        box.appendChild(el("pre", "tx", p.text));
-        const ops = el("div", "ops");
-        const close = () => { ed.preview = null; ed.render(); };
-        const mk = (label, cls, fn) => {
-            const b = el("button", cls, label);
-            b.type = "button";
-            b.addEventListener("click", (e) => { e.preventDefault(); fn(); });
-            ops.appendChild(b);
-        };
-        if (!p.error) {
-            mk("应用", "p", () => { ed.enhancer.applyPreview(); });
-            mk("复制", "s", () => { navigator.clipboard?.writeText(p.text); });
-        }
-        mk("丢弃", "d", close);
-        box.appendChild(ops);
-        return box;
-    }
-
-    return { promptArea, previewBlock };
+    return { promptArea };
 }

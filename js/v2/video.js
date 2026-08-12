@@ -398,8 +398,9 @@ export function createVideoEditor(ed, { api }) {
         head.appendChild(del);
         panel.appendChild(head);
 
-        // 提示词 + 🪄（共享 promptbox；rv2v 段开 @ 引用挂载）
+        // 提示词 + 🪄 对话改写（共享 promptbox；rv2v 段开 @ 引用挂载）
         const chipsRef = segRefChips(ed, { api }, seg);
+        const segKey = "seg:" + i;
         panel.appendChild(ed.promptbox.promptArea(
             () => seg.prompt,
             (v) => { seg.prompt = v; store.commit(); },
@@ -413,10 +414,27 @@ export function createVideoEditor(ed, { api }) {
                       store.commit();
                       chipsRef.update();
                   }
-              } },
+              },
+              onWand: () => ed.agentchat?.toggle(segKey) },
         ));
-        const pv = ed.promptbox.previewBlock(i);
-        if (pv) panel.appendChild(pv);
+        if (ed.agentchat?.isOpen(segKey)) {
+            panel.appendChild(ed.agentchat.panel(segKey, {
+                name: "片段 " + (i + 1),
+                makeTarget: () => ({
+                    key: segKey, name: "片段 " + (i + 1), task: store.mode(),
+                    duration: Number(ed.store.get().segments[i]?.durationSec) || 5.0,
+                    text: ed.store.get().segments[i]?.prompt || "",
+                }),
+                assets: () => (store.get().library || []).map((c) => ({
+                    key: assetKey(c), kind: c.kind || "image",
+                    pinned: c.pinned !== false,
+                })),
+                apply: (v) => {
+                    const sg = store.get().segments[i];
+                    if (sg) { sg.prompt = v; store.commit({ structural: true }); }
+                },
+            }));
+        }
         panel.appendChild(chipsRef.element);
         return panel;
     }

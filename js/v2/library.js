@@ -157,16 +157,18 @@ export function createLibrary(ed, { api }) {
     head.appendChild(cfgBtn);
     root.appendChild(head);
 
-    // 全局提示词（🪄 全局；@ 只列常驻卡——按需卡不在全局清单里）
+    // 全局提示词（🪄 对话改写；@ 只列常驻卡——按需卡不在全局清单里）
+    // promptArea 只建一次（保 textarea 焦点）；对话面板挂 chatHolder，随 render 刷新
     const gpRow = el("div", "sd2-lib-gp");
     gpRow.appendChild(ed.promptbox.promptArea(
         () => ed.store.get().global.prompt,
         (v) => { ed.store.get().global.prompt = v; ed.store.commit(); },
-        { wandTarget: "global", mentionScope: () => pinnedMentionItems() },
+        { wandTarget: "global", mentionScope: () => pinnedMentionItems(),
+          onWand: () => ed.agentchat?.toggle("global") },
     ));
     root.appendChild(gpRow);
-    const pvHolder = el("div", "");
-    root.appendChild(pvHolder);
+    const chatHolder = el("div", "");
+    root.appendChild(chatHolder);
 
     function pinnedMentionItems() {
         const lib = ed.store.get().library || [];
@@ -415,10 +417,26 @@ export function createLibrary(ed, { api }) {
             grid.appendChild(cardEl(c));
         }
         grid.appendChild(addCard());
-        // 全局预览块（🪄 全局扩写的结果）
-        pvHolder.innerHTML = "";
-        const pv = ed.promptbox.previewBlock("global");
-        if (pv) pvHolder.appendChild(pv);
+        // 全局对话改写面板（开关状态在 ed.chatState，随 render 挂载/卸载）
+        chatHolder.innerHTML = "";
+        if (ed.agentchat?.isOpen("global")) {
+            chatHolder.appendChild(ed.agentchat.panel("global", {
+                name: "全局提示词",
+                makeTarget: () => ({
+                    key: "global", name: "全局提示词", task: ed.store.mode(),
+                    duration: Number(ed.store.get().segments[0]?.durationSec) || 5.0,
+                    text: ed.store.get().global.prompt || "",
+                }),
+                assets: () => (ed.store.get().library || [])
+                    .filter((c) => c.pinned !== false)
+                    .map((c) => ({ key: assetKey(c), kind: c.kind || "image",
+                                   pinned: true })),
+                apply: (v) => {
+                    ed.store.get().global.prompt = v;
+                    ed.store.commit({ structural: true });
+                },
+            }));
+        }
     }
 
     // 服务状态摘要（config.js 保存后也会调）

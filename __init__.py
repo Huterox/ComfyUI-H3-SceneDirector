@@ -27,5 +27,6 @@ WEB_DIRECTORY = "./js"
 from .director.nodes import NODE_CLASS_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS
 from .director import routes as _routes  # noqa: F401  （导入即注册路由）
 from .director import studio as _studio  # noqa: F401  （配置/项目库路由）
+from .director import agent_svc as _agent_svc  # noqa: F401  （项目 agent 路由）
 
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]

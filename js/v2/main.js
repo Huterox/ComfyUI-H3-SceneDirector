@@ -24,7 +24,7 @@ import { createCards } from "./cards.js";
 import { createLibrary } from "./library.js";
 import { createConfig } from "./config.js";
 import { createExtras } from "./extras.js";
-import { createEnhancer } from "./enhance.js";
+import { createAgentChat } from "./agentchat.js";
 import { createVideoEditor } from "./video.js";
 import { createLogs } from "./logs.js";
 
@@ -437,9 +437,9 @@ function initEditor(node) {
     const ed = {
         node, store, container,
         selectedIndex: 0,
-        preview: null,     // {text, target: 段号|"global"|"shot:N", name, error?}
+        chatState: {},   // 各目标（段/镜/全局）的对话改写面板状态（跨重绘存活）
         liveOn: true,
-        statuses: null,    // 最近一次 /status 响应
+        statuses: null,  // 最近一次 /status 响应
     };
     node._h3sdEditor = ed;
 
@@ -454,8 +454,7 @@ function initEditor(node) {
     ed.extras = createExtras(ed, { api });
     ed.els.root.appendChild(ed.extras.element);    // 胶片带：输出条之后
     ed.els.root.appendChild(ed.extras.statusEl);   // 状态行
-    ed.enhancer = createEnhancer(ed, { api });
-    ed.els.root.appendChild(ed.enhancer.element);  // v3 起为隐藏占位（配置在服务端）
+    ed.agentchat = createAgentChat(ed, { api });   // 项目 agent 对话改写（🪄）
     ed.videoEditor = createVideoEditor(ed, { api });
     ed.logs = createLogs(ed, { api });
     ed.els.root.appendChild(ed.logs.element);      // 运行日志条：沉底

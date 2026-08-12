@@ -183,7 +183,6 @@ export function createConfig(ed, { api }) {
                 if (!r.ok) throw new Error("HTTP " + r.status);
                 close();
                 ed.library?.refreshConfig?.();
-                ed.enhancer?.reloadConfig?.();
             } catch (e) {
                 status.textContent = "✗ 保存失败：" + (e?.message || e);
                 status.className = "meta st bad";
