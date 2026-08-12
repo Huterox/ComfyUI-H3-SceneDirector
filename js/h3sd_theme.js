@@ -13,9 +13,8 @@ function polish(node) {
     node._h3sdThemed = true;
     try {
         // 全局提示词可见性修复：Director 在批量/fl2v 模式把底部全局面板
-        // （全局提示词 + 全局参考）整个 hidden 掉。
-        // v3 起 t2v/i2v/r2v 由我们的工作台组件接管（设定表/资产卡取代全局面板，
-        // 隐藏由 wb/main.js 的 applyMode 负责），这里只保 fl2v 模式的强制放出。
+        // （全局提示词 + 全局参考）整个 hidden 掉，用户看不到全局提示词。
+        // 包一层 applyTaskLayout：布局算完再强制放出全局面板。
         if (!ed._h3sdGpFixed) {
             ed._h3sdGpFixed = true;
             const origLayout = ed.applyTaskLayout?.bind(ed);
@@ -23,13 +22,10 @@ function polish(node) {
                 ed.applyTaskLayout = (...args) => {
                     const out = origLayout(...args);
                     try {
-                        const k = String(ed.getTaskKey?.() || "").toLowerCase();
-                        if (k === "fl2v") {
-                            const split = ed.root?.querySelector(".bd-split");
-                            split?.classList.remove("hidden");
-                            const gp = ed.root?.querySelector('[data-r="global-panel"]');
-                            if (gp) gp.style.display = "";
-                        }
+                        const split = ed.root?.querySelector(".bd-split");
+                        split?.classList.remove("hidden");
+                        const gp = ed.root?.querySelector('[data-r="global-panel"]');
+                        if (gp) gp.style.display = "";
                     } catch (e) { /* 忽略 */ }
                     return out;
                 };
@@ -86,10 +82,6 @@ function polish(node) {
             });
             mk("丢弃", "h3sd-btn danger", hide);
             pe.body?.insertBefore(box, pe.body.firstChild);
-            // 两根大渐变按钮（内联样式 #3b82f6/#6366f1 全宽条）收进我们的
-            // 视觉体系：打类名，颜色交给 h3sd_theme.css（!important 压内联）
-            pe.enhanceCurrentBtn?.classList.add("h3sd-pe-btn", "cur");
-            pe.enhanceAllBtn?.classList.add("h3sd-pe-btn", "all");
             if (origApply) {
                 pe.setActivePromptText = (text) => {
                     if (pe._h3sdPreviewNext) {
