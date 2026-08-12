@@ -155,24 +155,46 @@ def skill_guide():
     return "\n\n".join(parts)
 
 
-_SYSTEM_TEMPLATE = """你是 SceneDirector 工作台的项目 agent——一位专业的 MiniMax H3 视频分镜提示词导演。
-你通过「对话改写」帮用户打磨分镜提示词。整个项目共用你这一条会话：你记得本项目先前所有的设定、素材与改写决策。
+def workbench_guide():
+    """scenedirector-workbench 手册正文（自动创作 agent 的操作说明）。"""
+    body = _read_skill_file("../scenedirector-workbench/SKILL.md")
+    if body.startswith("---"):
+        end = body.find("\n---", 3)
+        if end != -1:
+            body = body[end + 4:].strip()
+    return body
 
-# 输出契约（必须严格遵守）
-- 用户要求改写/创作提示词时：把最终版提示词完整放进 ```prompt 代码块（块内只有提示词正文，不要任何解说），代码块外最多两句改动说明。
+
+_SYSTEM_TEMPLATE = """你是 SceneDirector 工作台的项目 agent——一位专业的 MiniMax H3 视频分镜提示词导演。
+你有两种工作方式，整个项目共用你这一条会话：你记得本项目先前所有的设定、素材与创作/改写决策。
+
+# 方式一：对话改写（默认）
+用户给出「改写目标」时，帮用户打磨那一段提示词：
+- 把最终版提示词完整放进 ```prompt 代码块（块内只有提示词正文，不要任何解说），代码块外最多两句改动说明。
 - 用户只是提问/闲聊/征求意见时：直接回答，不要给 ```prompt 代码块。
 - 与用户的对话用中文；提示词正文的语言与「当前内容」保持一致（当前为空时遵循技能规范）。
 - 不要发明不存在的资产：引用用户提供的资产用 @键（如 @参考·沈青霜）；已有的 <Picture N>/<Subject N> 锚点保持原样、语义不变。
 - 时间轴写法（0-1s: … / [Shot 1] At 00:04.000 …）与目标秒数对齐，不得超过目标时长。
 - 每段结尾保留 Ending state / handoff 衔接描述（分镜链靠它做段间连续）。
 
+# 方式二：自动创作（消息以 ⟦autoplan⟧ 开头）
+你是总导演：按下方《SceneDirector 工作台操作手册》用工具把工作台布置好。
+- 修改是全量覆盖语义；动手前先 get_workbench 看现状。
+- 关键设定（题材/风格/时长/角色）不明就 ask_user 反问，不要瞎编。
+- 完成后用中文一段话总结交付（故事梗概 + 分段结构 + 资产清单），不要给 ```prompt 代码块。
+
 # 提示词规范（h3-prompt-writing 技能）
 {guide}
+
+# SceneDirector 工作台操作手册
+{manual}
 """
 
 
 def system_prompt():
-    return _SYSTEM_TEMPLATE.replace("{guide}", skill_guide())
+    return (_SYSTEM_TEMPLATE
+            .replace("{guide}", skill_guide())
+            .replace("{manual}", workbench_guide()))
 
 
 # ---------------------------------------------------------------------------
@@ -216,7 +238,7 @@ class ProjectAgent:
     服务重启都不丢对话）。
     """
 
-    def __init__(self, project, session, model, api_key="", sys_prompt=""):
+    def __init__(self, project, session, model, api_key="", sys_prompt="", tools=None):
         self.project = project
         self.session = session
         self.lock = asyncio.Lock()
@@ -227,7 +249,7 @@ class ProjectAgent:
             initial_state={
                 "system_prompt": sys_prompt or system_prompt(),
                 "model": model,
-                "tools": [],
+                "tools": list(tools or []),
             },
             get_api_key=lambda provider: self._api_key,
         )
@@ -302,6 +324,21 @@ _REPO = None
 _REPO_LOCK = threading.Lock()
 #: 工作台快照缓存（前端随请求推上来，P5 的 agent 工具从这里读工作台）
 _WORKBENCH: dict[str, dict] = {}
+#: 工具工厂（autoplan 注册）：project -> [AgentTool...]
+_TOOL_FACTORY = None
+#: 项目重置钩子（autoplan 注册：清草稿与作业）
+_RESET_HOOKS: list = []
+
+
+def register_tool_factory(fn):
+    """注册项目级工具工厂（autoplan.py 导入时调用）。"""
+    global _TOOL_FACTORY
+    _TOOL_FACTORY = fn
+
+
+def register_reset_hook(fn):
+    """注册项目重置钩子（autoplan.py 导入时调用）。"""
+    _RESET_HOOKS.append(fn)
 
 
 def _db_path():
@@ -340,8 +377,9 @@ def get_project_agent(project, cfg=None):
         return cached
     # 首次或配置变更：session 不变，agent 重建（消息从 session 恢复）
     _sid, session = _session_for(project)
+    tools = _TOOL_FACTORY(project) if _TOOL_FACTORY else []
     pa = ProjectAgent(project, session, model_from_config(cfg),
-                      api_key=llm.get("api_key") or "")
+                      api_key=llm.get("api_key") or "", tools=tools)
     pa.fingerprint = fp
     _AGENTS[project] = pa
     return pa
@@ -390,6 +428,11 @@ def reset_project(project):
             break
     _AGENTS.pop(project, None)
     _WORKBENCH.pop(project, None)
+    for hook in _RESET_HOOKS:
+        try:
+            hook(project)
+        except Exception as e:
+            _LOG.warning("重置钩子失败: %s", e)
     if victim:
         repo.delete(victim)
         return True
@@ -488,7 +531,10 @@ __all__ = [
     "model_from_config",
     "system_prompt",
     "skill_guide",
+    "workbench_guide",
     "history_view",
     "get_project_agent",
     "reset_project",
+    "register_tool_factory",
+    "register_reset_hook",
 ]

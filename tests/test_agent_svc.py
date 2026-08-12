@@ -65,7 +65,8 @@ def test_model_from_config():
 def test_system_prompt():
     sp = A.system_prompt()
     check("sys_has_guide", "h3-prompt-writing" in sp and "integrated_multimodal_description" in sp)
-    check("sys_has_contract", "```prompt" in sp and "⟦" not in sp)
+    check("sys_has_contract", "```prompt" in sp and "⟦autoplan⟧" in sp)
+    check("sys_has_manual", "工作台操作手册" in sp and "17k+5" in sp)
 
 
 def test_history_view():
