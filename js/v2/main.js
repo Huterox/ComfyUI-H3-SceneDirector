@@ -25,6 +25,7 @@ import { createLibrary } from "./library.js";
 import { createConfig } from "./config.js";
 import { createExtras } from "./extras.js";
 import { createAgentChat } from "./agentchat.js";
+import { createAutopilot } from "./autopilot.js";
 import { createVideoEditor } from "./video.js";
 import { createLogs } from "./logs.js";
 
@@ -181,13 +182,8 @@ function buildSkeleton(ed) {
     bar.appendChild(sum);
     bar.appendChild(el("span", "sp"));
     const aiBtn = el("button", "sd2-btn ai", "✨ AI 自动创作");
-    aiBtn.title = "从一句话想法到整条分镜：agent 自动规划/生图/写提示词（接入中）";
-    aiBtn.addEventListener("click", () => {
-        // P6 里程碑接入自动创作抽屉；先给个不打扰的反馈
-        const old = aiBtn.textContent;
-        aiBtn.textContent = "✨ 接入中…";
-        setTimeout(() => { aiBtn.textContent = old; }, 1200);
-    });
+    aiBtn.title = "从一句话想法到整条分镜：agent 自动规划/生图/写提示词";
+    aiBtn.addEventListener("click", () => ed.autopilot?.open());
     bar.appendChild(aiBtn);
     const addBtn = el("button", "sd2-btn primary", "+ 分镜");
     addBtn.addEventListener("click", () => {
@@ -455,6 +451,7 @@ function initEditor(node) {
     ed.els.root.appendChild(ed.extras.element);    // 胶片带：输出条之后
     ed.els.root.appendChild(ed.extras.statusEl);   // 状态行
     ed.agentchat = createAgentChat(ed, { api });   // 项目 agent 对话改写（🪄）
+    ed.autopilot = createAutopilot(ed, { api });   // AI 自动创作抽屉（✨）
     ed.videoEditor = createVideoEditor(ed, { api });
     ed.logs = createLogs(ed, { api });
     ed.els.root.appendChild(ed.logs.element);      // 运行日志条：沉底
@@ -582,6 +579,7 @@ app.registerExtension({
             try { this._h3sdEditor?.extras?.dispose?.(); } catch (e) { /* 忽略 */ }
             try { this._h3sdEditor?.logs?.dispose?.(); } catch (e) { /* 忽略 */ }
             try { this._h3sdEditor?.config?.dispose?.(); } catch (e) { /* 忽略 */ }
+            try { this._h3sdEditor?.autopilot?.dispose?.(); } catch (e) { /* 忽略 */ }
             try {
                 document.querySelectorAll(".sd2-refpick, .sd2-asset-edit").forEach((p) => p.remove());
             } catch (e) { /* 忽略 */ }
