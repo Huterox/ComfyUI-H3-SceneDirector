@@ -280,3 +280,6 @@
 .mmx-host .sd2-inp.model { max-width: 180px; }
 .mmx-host .sd2-pe-model { display: inline-flex; align-items: center; gap: 4px; }
 .mmx-host .sd2-pe-model .sd2-inp { max-width: 170px; }
+
+/* 全局面板强制可见：保底一排可用高度，再也不被折叠没 */
+.mmx-host .sd2-global { flex: 0 1 auto; min-height: 148px; max-height: 55%; overflow-y: auto; }

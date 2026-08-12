@@ -47,7 +47,40 @@ function ensureWidth(node) {
     ed.container.style.width = w + "px";
 }
 
-// 任务模式 -> UNET 模型联动（沿 Chain 的 MODEL 输入找 UNETLoader，兼容中间隔补丁节点）。
+// 输出条比例 -> 图里的 ResolutionSelector 节点（Chain/Conditioning 的宽高
+// 是从它连线来的，只写 List 自己的 widget 不生效——"比例失效" bug 的根因）。
+// 顺带同步 List 的 width/height/ref_max_size widget（store.syncWidgets 在做）。
+const RS_ASPECT = {
+    "1:1 (方形)": "1:1 (Square)",
+    "3:4 (竖版标准)": "3:4 (Portrait Standard)",
+    "4:3 (标准)": "4:3 (Standard)",
+    "9:16 (竖屏)": "9:16 (Portrait Widescreen)",
+    "16:9 (宽屏)": "16:9 (Widescreen)",
+    "21:9 (超宽)": "21:9 (Ultrawide)",
+};
+
+function pushResolution(ed) {
+    try {
+        const g = app.graph;
+        const nodes = g?._nodes || [];
+        const byId = (id) => nodes.find((n) => String(n.id) === String(id));
+        const chain = nodes.find((n) => n.comfyClass === "H3SceneDirectorChain");
+        // 优先找连到 Chain width 输入的那个 ResolutionSelector
+        let rs = null;
+        const wIn = chain?.inputs?.find((i) => /width/i.test(i.name || "") && i.link != null);
+        if (wIn) {
+            const cand = byId(g.links[wIn.link]?.origin_id);
+            if (cand?.type === "ResolutionSelector") rs = cand;
+        }
+        if (!rs) rs = nodes.find((n) => n.type === "ResolutionSelector");
+        if (!rs) return;
+        const o = ed.store.get().output;
+        const aspectW = rs.widgets?.find((w) => w.name === "aspect_ratio");
+        const mpW = rs.widgets?.find((w) => w.name === "megapixels");
+        if (aspectW) aspectW.value = RS_ASPECT[o.aspectRatio] || o.aspectRatio;
+        if (mpW) mpW.value = o.megapixels;
+    } catch (e) { /* 联动失败不影响编辑 */ }
+}
 // 两个模型位由输出条的「模型联动」下拉配置，随工作流保存（output.modelGen/modelRef）。
 function linkModel(node, modeKey, store) {
     try {
@@ -154,7 +187,11 @@ function buildSkeleton(ed) {
     const asp = el("select", "sd2-inp");
     for (const a of ASPECTS) asp.appendChild(new Option(a[0], a[0]));
     asp.value = o().aspectRatio;
-    asp.addEventListener("change", () => { o().aspectRatio = asp.value; ed.store.commit(); });
+    asp.addEventListener("change", () => {
+        o().aspectRatio = asp.value;
+        ed.store.commit();
+        pushResolution(ed);
+    });
     out.appendChild(asp);
     out.appendChild(el("span", "lbl", "百万像素"));
     const mp = el("input", "sd2-inp num");
@@ -163,6 +200,7 @@ function buildSkeleton(ed) {
         o().megapixels = Math.min(16, Math.max(0.1, parseFloat(mp.value) || 1.0));
         mp.value = o().megapixels;
         ed.store.commit();
+        pushResolution(ed);
     });
     out.appendChild(mp);
     out.appendChild(el("span", "lbl", "帧率"));
@@ -292,6 +330,7 @@ function initEditor(node) {
 
     linkModel(node, store.mode(), store);
     ed.linkModel = (key) => linkModel(node, key, store);
+    pushResolution(ed);   // 加载即把输出条的比例/像素推到图里的 ResolutionSelector
     ed.render();
     ed.extras.start();
     return ed;
