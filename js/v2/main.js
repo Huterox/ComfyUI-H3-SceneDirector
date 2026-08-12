@@ -201,45 +201,6 @@ function buildSkeleton(ed) {
     au.addEventListener("change", () => { o().audioMode = au.value; ed.store.commit(); });
     out.appendChild(au);
     out.appendChild(el("span", "sp"));
-    // 模型联动：两系模型位（切模式自动换 UNETLoader 的 unet_name）
-    const modelOpts = (() => {
-        try {
-            const nodes = app.graph?._nodes || [];
-            const chain = nodes.find((n) => n.comfyClass === "H3SceneDirectorChain");
-            const link = chain?.inputs?.[0]?.link != null ? g_links(app.graph, chain.inputs[0].link) : null;
-            let src = link ? byId(app.graph, link.origin_id) : null;
-            let hops = 0;
-            while (src && src.type !== "UNETLoader" && hops < 4) {
-                const inp = src.inputs?.find((i) => i.link != null && /MODEL/i.test(i.type || ""));
-                if (!inp) break;
-                src = byId(app.graph, g_links(app.graph, inp.link)?.origin_id);
-                hops += 1;
-            }
-            const vals = src?.widgets?.find((w) => w.name === "unet_name")?.options?.values;
-            return Array.isArray(vals) && vals.length ? vals : null;
-        } catch (e) { return null; }
-        function g_links(g, id) { return g.links[id]; }
-        function byId(g, id) { return (g._nodes || []).find((n) => String(n.id) === String(id)); }
-    })();
-    const mkModelSel = (label, field, fallback) => {
-        out.appendChild(el("span", "lbl", label));
-        const sel = el("select", "sd2-inp model");
-        const opts = modelOpts || [fallback];
-        for (const v of opts) sel.appendChild(new Option(v.replace(/^minimax_h3_|\.safetensors$/g, ""), v));
-        const cur = o()[field] || fallback;
-        if (![...sel.options].some((x) => x.value === cur)) sel.appendChild(new Option(cur, cur));
-        sel.value = cur;
-        sel.title = label + "（切模式时自动换 UNETLoader 的模型）";
-        sel.addEventListener("change", () => {
-            o()[field] = sel.value;
-            ed.store.commit();
-            linkModel(ed.node, ed.store.mode(), ed.store);
-        });
-        out.appendChild(sel);
-        return sel;
-    };
-    mkModelSel("生成系模型", "modelGen", REF_MODELS.gen);
-    mkModelSel("参考系模型", "modelRef", REF_MODELS.ref);
     const liveBtn = el("button", "sd2-btn", "实时预览：开");
     liveBtn.addEventListener("click", () => {
         ed.liveOn = !ed.liveOn;
@@ -329,7 +290,8 @@ function initEditor(node) {
         };
     }
 
-    linkModel(node, store.mode());
+    linkModel(node, store.mode(), store);
+    ed.linkModel = (key) => linkModel(node, key, store);
     ed.render();
     ed.extras.start();
     return ed;

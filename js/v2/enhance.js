@@ -4,6 +4,7 @@
 // 调用链：🪄 -> POST /minimax/director/enhance -> ed.preview -> cards.js
 // 渲染内联预览块 -> 「应用」-> applyPreview() 写回状态 + commit。
 // 视觉参考（参考图/首帧）经 /minimax/director/image_b64 取 base64 随请求发给 LLM。
+import { app } from "../../../scripts/app.js";
 import { el, splitRel, taskKeyFromLabel } from "./util.js";
 
 export function createEnhancer(ed, { api }) {
@@ -89,6 +90,53 @@ export function createEnhancer(ed, { api }) {
     tplRow.appendChild(el("span", "lbl", "模板"));
     tplRow.appendChild(tpl);
     body.appendChild(tplRow);
+
+    // 模型联动（两系模型位；切模式自动换 UNETLoader，无需手动）
+    const modelOpts = (() => {
+        try {
+            const nodes = app.graph?._nodes || [];
+            const byId = (id) => nodes.find((n) => String(n.id) === String(id));
+            const chain = nodes.find((n) => n.comfyClass === "H3SceneDirectorChain");
+            let src = chain?.inputs?.[0]?.link != null
+                ? byId(app.graph.links[chain.inputs[0].link]?.origin_id) : null;
+            let hops = 0;
+            while (src && src.type !== "UNETLoader" && hops < 4) {
+                const inp = src.inputs?.find((i) => i.link != null && /MODEL/i.test(i.type || ""));
+                if (!inp) break;
+                src = byId(app.graph.links[inp.link]?.origin_id);
+                hops += 1;
+            }
+            const vals = src?.widgets?.find((w) => w.name === "unet_name")?.options?.values;
+            return Array.isArray(vals) && vals.length ? vals : null;
+        } catch (e) { return null; }
+    })();
+    function modelSel(label, field, fallback) {
+        const sel = el("select", "sd2-inp");
+        for (const v of (modelOpts || [fallback])) {
+            sel.appendChild(new Option(v.replace(/^minimax_h3_|\.safetensors$/g, ""), v));
+        }
+        const out = store.get().output;
+        const cur = out[field] || fallback;
+        if (![...sel.options].some((x) => x.value === cur)) sel.appendChild(new Option(cur, cur));
+        sel.value = cur;
+        sel.title = "切模式时自动换 UNETLoader 的模型（此处只是选文件，切换是自动的）";
+        sel.addEventListener("change", () => {
+            out[field] = sel.value;
+            store.commit();
+            ed.linkModel?.(store.mode());
+        });
+        const wrap = el("span", "sd2-pe-model");
+        wrap.appendChild(el("span", "lbl", label));
+        wrap.appendChild(sel);
+        return wrap;
+    }
+    const modelRow = el("div", "sd2-pe-row");
+    modelRow.appendChild(el("span", "lbl", "模型联动"));
+    modelRow.appendChild(modelSel("生成系(t2v/i2v/fl2v)", "modelGen",
+        "minimax_h3_fl2va_pruned_int8_convrot.safetensors"));
+    modelRow.appendChild(modelSel("参考系(r2v/v2v/rv2v)", "modelRef",
+        "minimax_h3_ref2va_pruned_int8_convrot.safetensors"));
+    body.appendChild(modelRow);
 
     const statusLine = el("div", "sd2-pe-status", "");
     body.appendChild(statusLine);
