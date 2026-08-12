@@ -7,8 +7,8 @@
 //   * 每段提示词框带 🪄（调 enhance.js，结果内联预览-确认-应用）；
 //   * 提示词框支持 @ 引用（图片/音频/视频编号插入 <Picture N> 等）；
 //   * 段参考图编号接在全局图片之后（对齐后端 <Picture N> 语义）。
-import { el, fmtTime, uploadImage, refThumbURL, lightbox, splitRel,
-         setDuration } from "./util.js";
+import { el, fmtTime, uploadImage, refThumbURL, lightbox, splitRel, setDuration,
+         viewURL } from "./util.js";
 
 export function createCards(ed, { api }) {
 
@@ -177,36 +177,58 @@ export function createCards(ed, { api }) {
     function videoSlot(refList, index, onChange) {
         const ref = refList.find((r) => Number(r.index) === index && r.videoFile);
         const slot = el("div", "sd2-video" + (ref ? " has" : ""));
-        slot.textContent = ref ? "视频" + (index + 1) + " · " + splitRel(ref.videoFile).image : "视频" + (index + 1);
+        let clickTimer = 0;
         if (ref) {
+            const { image, subfolder } = splitRel(ref.videoFile);
+            const v = document.createElement("video");
+            v.src = viewURL(api, image, subfolder, "input");
+            v.muted = true;
+            v.preload = "metadata";   // 首帧当缩略图
+            slot.appendChild(v);
+            slot.appendChild(el("span", "tag", "视频" + (index + 1)));
             const x = el("u", "x", "×");
+            x.title = "清除";
             x.addEventListener("click", (e) => {
                 e.stopPropagation();
+                clearTimeout(clickTimer);
                 refList.splice(refList.indexOf(ref), 1);
                 onChange();
             });
             slot.appendChild(x);
+            slot.title = "点击更换；双击放大播放";
+        } else {
+            slot.textContent = "视频" + (index + 1);
         }
         slot.addEventListener("click", () => {
-            const inp = document.createElement("input");
-            inp.type = "file";
-            inp.accept = "video/*";
-            inp.style.display = "none";
-            inp.addEventListener("change", async () => {
-                const f = inp.files && inp.files[0];
-                inp.remove();
-                if (!f) return;
-                try {
-                    const rel = await doUpload(f);
-                    const old = refList.find((r) => Number(r.index) === index);
-                    if (old) old.videoFile = rel;
-                    else refList.push({ index, videoFile: rel });
-                    onChange();
-                } catch (err) { console.error("[sd2] 上传失败", err); }
-            });
-            document.body.appendChild(inp);
-            inp.click();
+            clearTimeout(clickTimer);
+            clickTimer = setTimeout(() => {
+                const inp = document.createElement("input");
+                inp.type = "file";
+                inp.accept = "video/*";
+                inp.style.display = "none";
+                inp.addEventListener("change", async () => {
+                    const f = inp.files && inp.files[0];
+                    inp.remove();
+                    if (!f) return;
+                    try {
+                        const rel = await doUpload(f);
+                        const old = refList.find((r) => Number(r.index) === index);
+                        if (old) old.videoFile = rel;
+                        else refList.push({ index, videoFile: rel });
+                        onChange();
+                    } catch (err) { console.error("[sd2] 上传失败", err); }
+                });
+                document.body.appendChild(inp);
+                inp.click();
+            }, 260);
         });
+        if (ref) {
+            slot.addEventListener("dblclick", () => {
+                clearTimeout(clickTimer);
+                const { image, subfolder } = splitRel(ref.videoFile);
+                lightbox(viewURL(api, image, subfolder, "input"), true);
+            });
+        }
         return slot;
     }
 
