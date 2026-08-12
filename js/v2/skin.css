@@ -298,3 +298,8 @@
 .mmx-host .sd2-log-line { white-space: nowrap; color: var(--text); }
 .mmx-host .sd2-log-line.dim { color: var(--dimmer); }
 .mmx-host .sd2-btn.mini { padding: 0 8px; font-size: 11px; line-height: 18px; }
+
+/* 魔法棒扩写中：呼吸脉冲 + 等待光标 */
+.mmx-host .sd2-wand.busy { cursor: wait; border-color: var(--accent);
+    animation: sd2-wand-pulse 1s ease-in-out infinite; }
+@keyframes sd2-wand-pulse { 0%, 100% { opacity: .45; } 50% { opacity: 1; } }

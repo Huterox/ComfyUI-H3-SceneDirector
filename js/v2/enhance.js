@@ -173,6 +173,11 @@ export function createEnhancer(ed, { api }) {
     function setStatus(text, kind) {
         statusLine.textContent = text || "";
         statusLine.className = "sd2-pe-status" + (kind ? " " + kind : "");
+        // 错误发生在折叠面板里用户看不见——自动展开让人知道死在哪
+        if (kind === "error" && body.classList.contains("hidden")) {
+            body.classList.remove("hidden");
+            foldBtn.textContent = "收起";
+        }
     }
 
     // --- LLM 调用 ---------------------------------------------------------------
@@ -195,11 +200,13 @@ export function createEnhancer(ed, { api }) {
         const s = store.get();
         const mode = store.mode();
         if (target === "global") {
+            const d0 = s.segments[0]?.durationSec;
             return {
                 name: "全局提示词",
                 taskKey: mode,
                 prompt: String(s.global.prompt || "").trim(),
                 imageFiles: (s.global.refs || []).map((r) => r.imageFile).filter(Boolean),
+                duration: Number(d0) || 5.0,
             };
         }
         if (typeof target === "string" && target.startsWith("shot:")) {
@@ -211,6 +218,7 @@ export function createEnhancer(ed, { api }) {
                 taskKey: "fl2v",
                 prompt: String(sh.prompt || "").trim(),
                 imageFiles: [sh.startImage?.imageFile, sh.endImage?.imageFile].filter(Boolean),
+                duration: Number(sh.durationSec) || 5.0,
             };
         }
         const i = Number.isInteger(target) ? target : ed.selectedIndex;
@@ -223,6 +231,7 @@ export function createEnhancer(ed, { api }) {
             taskKey: taskKeyFromLabel(seg.taskType || mode),
             prompt: String(seg.prompt || "").trim(),
             imageFiles: files,
+            duration: Number(seg.durationSec) || 5.0,
         };
     }
 
@@ -253,7 +262,7 @@ export function createEnhancer(ed, { api }) {
                     model,
                     prompt: info.prompt,
                     task_type: info.taskKey,
-                    duration: 5.0,
+                    duration: info.duration || 5.0,
                     image_num: Math.max(1, images.length),
                     images,
                     api_format: fields.llm_api_format.value,

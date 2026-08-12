@@ -7,6 +7,7 @@
 """
 
 import base64
+import asyncio
 import io
 import json
 import logging
@@ -263,7 +264,11 @@ async def enhance(request):
                   if body.get("character_feature_enhance") is not None
                   else body.get("llm_character_feature_enhance"))
     try:
-        text = prompt_enhance.enhance(
+        # prompt_enhance 是同步 urllib——直接调会把整个 ComfyUI 事件循环
+        # 冻结到 LLM 返回为止（所有 HTTP 排队，界面看起来就是"没反应"）。
+        # 扔进线程池，LLM 慢也不挡队列/进度事件/其他请求。
+        text = await asyncio.to_thread(
+            prompt_enhance.enhance,
             prompt,
             task=task,
             duration=float(body.get("duration", 5.0) or 5.0),

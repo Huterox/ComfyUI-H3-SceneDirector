@@ -240,9 +240,20 @@ export function createCards(ed, { api }) {
         const wand = el("button", "sd2-wand", "🪄 扩写");
         wand.type = "button";
         wand.title = "LLM 扩写这段提示词（用增强器里的配置；结果先预览，确认才应用）";
-        wand.addEventListener("click", (e) => {
+        wand.addEventListener("click", async (e) => {
             e.preventDefault();
-            ed.enhancer.enhanceTarget(wandTarget);
+            if (wand.disabled) return;              // 防连点
+            wand.disabled = true;
+            const old = wand.textContent;
+            wand.textContent = "⏳ 扩写中…";
+            wand.classList.add("busy");
+            try {
+                await ed.enhancer.enhanceTarget(wandTarget);
+            } finally {
+                wand.disabled = false;
+                wand.textContent = old;
+                wand.classList.remove("busy");
+            }
         });
         head.appendChild(wand);
         wrap.appendChild(head);
