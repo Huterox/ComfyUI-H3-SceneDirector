@@ -23,6 +23,8 @@ import contextlib
 import logging
 import math
 
+import torch
+
 import comfy.model_management as mm
 
 from .status import emit_log
@@ -84,6 +86,42 @@ def reserved_vram(extra_bytes):
         yield
     finally:
         mm.EXTRA_RESERVED_VRAM = old
+
+
+def weight_keep_bytes(reserve_bytes):
+    """采样期权重驻留上限 = 物理总量 − 规划余量。"""
+    total = float(torch.cuda.get_device_properties(mm.get_torch_device()).total_memory)
+    return max(0, int(total - reserve_bytes))
+
+
+def clamp_weight_residency(patcher, keep_bytes, name="模型"):
+    """把权重驻留主动压到 keep_bytes 以内，返回释放量（字节）。
+
+    为什么需要它：DynamicVRAM 下 free_memory 对 dynamic 模型互不相卸
+    （指望 aimdo 分配时按需抢救），partially_load 又只增不减——上一段
+    decode 把 DiT 驻留推高后，下一段采样带着高驻留进场；而第二段起
+    钉帧行 + 窗口加 span 让激活峰值更高，大块激活与按需抢救赛跑就会炸。
+    采样前主动压舱，把确定性握在自己手里。缺口由 prefetch 流水线补。
+    """
+    try:
+        loaded = int(patcher.loaded_size())
+    except Exception:
+        return 0
+    excess = loaded - int(keep_bytes)
+    if excess <= 256 * 1024**2:          # 256MB 以内的零头不折腾
+        return 0
+    try:
+        freed = int(patcher.partially_unload(patcher.offload_device, excess))
+    except Exception as e:
+        _LOG.warning("显存规划：%s 驻留压缩失败（忽略）: %r", name, e)
+        return 0
+    if freed > 0:
+        _LOG.info("显存规划：%s 权重驻留 %.1f -> %.1f GB（主动释放 %.1f GB）",
+                  name, loaded / 1024**3, (loaded - freed) / 1024**3,
+                  freed / 1024**3)
+        emit_log("显存规划：%s 权重驻留 %.1f → %.1f GB（主动压舱，缺口走异步预取）"
+                 % (name, loaded / 1024**3, (loaded - freed) / 1024**3))
+    return freed
 
 
 def fix_vae_decode_estimate(vae):

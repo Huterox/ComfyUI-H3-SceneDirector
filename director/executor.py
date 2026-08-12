@@ -534,9 +534,18 @@ def _run_chain_impl(model, vae, audio_vae, segments_raw, story_cond, sampler,
                     pass
 
             # 保留量只在采样期间抬高：decode 阶段回落默认，VAE 腾挪时
-            # 不必把 DiT 权重卸得太狠，下一段采样少拉回来
+            # 不必把 DiT 权重卸得太狠，下一段采样少拉回来。
+            # 采样前主动压舱：已驻留的权重不受保留量约束（dynamic 模型
+            # 互不相卸、partially_load 只增不减），不压就会带着高驻留
+            # 撞上第二段起更大的激活峰值。
             if vram_budget:
                 with B.reserved_vram(reserve_bytes):
+                    B.clamp_weight_residency(
+                        model, B.weight_keep_bytes(reserve_bytes), name="DiT")
+                    B.clamp_weight_residency(vae.patcher, 256 * 1024**2,
+                                             name="视频VAE")
+                    B.clamp_weight_residency(audio_vae.patcher, 256 * 1024**2,
+                                             name="音频VAE")
                     latent = _sample(model, positive, latent_in, seg_seed,
                                      sampler, sigmas, negative, cfg, live=_live)
             else:
