@@ -67,12 +67,42 @@ export function createStore({ node, app, api }) {
                 s.global = { ...defaultState().global, ...(data.global || {}) };
                 s.output = { ...defaultState().output, ...(data.output || {}) };
                 s.segments = Array.isArray(data.segments) && data.segments.length
-                    ? data.segments : [newSegment(5.0)];
-                s.shots = Array.isArray(data.shots) ? data.shots : [];
+                    ? data.segments.map(normLoadedSegment) : [newSegment(5.0)];
+                s.shots = Array.isArray(data.shots) ? data.shots.map(normLoadedShot) : [];
                 return s;
             }
         } catch (e) { /* 解析失败回退默认 */ }
         return defaultState(taskW?.value);
+    }
+
+    // 兼容 Director 时代的存档：段可能只有 start/length/frameCount 而没有
+    // durationSec——渲染层 seg.durationSec.toFixed 会直接崩（"死了 prompt" 的
+    // 根因：渲染崩在半路，卡片区根本没出来，编辑全落在别处）
+    function normLoadedSegment(s) {
+        const base = newSegment(5.0);
+        const out = { ...base, ...(s || {}) };
+        if (!Number.isFinite(parseFloat(out.durationSec))) {
+            const fc = parseInt(out.frameCount ?? out.length, 10);
+            const d = setDuration(Number.isFinite(fc) && fc > 0 ? fc / 24 : 5.0);
+            out.durationSec = d.durationSec;
+            out.frameCount = d.frameCount;
+        }
+        out.id = out.id || uid();
+        out.refs = Array.isArray(out.refs) ? out.refs : [];
+        out.refAudios = Array.isArray(out.refAudios) ? out.refAudios : [];
+        out.refVideos = Array.isArray(out.refVideos) ? out.refVideos : [];
+        out.genImage = out.genImage || { imageFile: "" };
+        return out;
+    }
+
+    function normLoadedShot(sh) {
+        const base = newShot(5.0);
+        const out = { ...base, ...(sh || {}) };
+        if (!Number.isFinite(parseFloat(out.durationSec))) out.durationSec = 5.0;
+        out.id = out.id || uid();
+        out.startImage = out.startImage || { imageFile: "" };
+        out.endImage = out.endImage || { imageFile: "" };
+        return out;
     }
 
     const mode = () => taskKeyFromLabel(state.global.taskType || taskW?.value);

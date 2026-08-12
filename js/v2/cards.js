@@ -294,7 +294,7 @@ export function createCards(ed, { api }) {
         head.appendChild(el("b", "", "提示词组 " + (i + 1)));
         const st = ed.statuses?.statuses?.[i];
         head.appendChild(el("span", "meta",
-            seg.durationSec.toFixed(1) + "s · " + seg.frameCount + " 帧 @24fps"
+            (Number(seg.durationSec) || 5).toFixed(1) + "s · " + seg.frameCount + " 帧 @24fps"
             + (st?.seed != null ? " · seed " + st.seed : "")));
         head.appendChild(el("span", "sp"));
         const left = el("button", "sd2-btn sm", "◀");
@@ -411,7 +411,7 @@ export function createCards(ed, { api }) {
         });
         const head = el("div", "sd2-card-head");
         head.appendChild(el("b", "", "镜 " + (i + 1)));
-        head.appendChild(el("span", "meta", shot.durationSec.toFixed(1) + "s · "
+        head.appendChild(el("span", "meta", (Number(shot.durationSec) || 5).toFixed(1) + "s · "
             + setDuration(shot.durationSec).frameCount + " 帧"));
         head.appendChild(el("span", "sp"));
         const left = el("button", "sd2-btn sm", "◀");
