@@ -14,6 +14,9 @@
     border-radius: 8px;
     display: flex; flex-direction: column; gap: 8px;
     width: 100%; box-sizing: border-box;
+    /* 节点拉高时内容跟着撑满：吃满 DOM widget 的分配高度，
+       多出的高度由主区（flex:1）吸收 */
+    height: 100%;
 }
 .mmx-host .sd2 * { box-sizing: border-box; }
 .mmx-host .sd2 button { font: inherit; cursor: pointer; }
@@ -67,7 +70,7 @@
 
 /* ---------- 主区与卡片 ---------- */
 .mmx-host .sd2-main { display: flex; flex-direction: column; gap: 8px;
-    max-height: 460px; overflow-y: auto; padding-right: 2px; }
+    flex: 1 1 auto; min-height: 180px; overflow-y: auto; padding-right: 2px; }
 .mmx-host .sd2-card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
     padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
 .mmx-host .sd2-card.sel { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(77, 163, 255, .35); }
@@ -233,3 +236,7 @@
 .mmx-host .sd2-video { max-height: 96px; }
 .mmx-host .sd2-ruler { overflow: hidden; }
 .mmx-host .sd2-ruler .inner { position: relative; height: 100%; }
+
+/* 容器吃满 DOM widget 的分配高度（Director 同款：min-height 变量 + height:100%） */
+.mmx-host { height: 100%; box-sizing: border-box; display: flex; flex-direction: column; }
+.mmx-host > .sd2 { flex: 1 1 auto; min-height: 0; }

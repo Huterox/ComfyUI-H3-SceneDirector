@@ -32,9 +32,11 @@ const REF_MODELS = {
 const REF_TASKS = new Set(["r2v", "v2v", "rv2v"]);
 
 function uiHeight(ed) {
-    // 内容驱动（Director 同款思路）：保底 BASE_H，内容多高就多高（封顶防呆）。
-    if (!ed?.els?.root) return BASE_H;
-    return Math.min(1600, Math.max(BASE_H, ed.els.root.scrollHeight + 10));
+    // 静态保底高（v1 验证过的姿势）：用户拉高节点时前端会把多余高度分给
+    // widget（height:100% 的内容跟着撑满，主区 flex:1 吸收）；内容超出时
+    // 主区自己滚。不能用 scrollHeight 动态算——分配高度会回流进测量值，
+    // 形成只涨不缩的反馈环（实测 1227 钉死）。
+    return BASE_H;
 }
 
 function ensureWidth(node) {
@@ -315,9 +317,10 @@ app.registerExtension({
                 onDraw() { ensureWidth(self); },
                 afterResize() { ensureWidth(self); },
             });
-            // 四点高度契约
-            widget.computeSize = (w) => [w, uiHeight(self._h3sdEditor)];
-            widget.computeLayoutSize = () => ({ minHeight: uiHeight(self._h3sdEditor), minWidth: MIN_W });
+            // 高度契约（v1 验证过的姿势）：只给 getMinHeight 保底，
+            // 不覆写 computeSize/computeLayoutSize——覆写会把高度钉死成
+            // 内容高，用户拉高节点时内容不再跟随（实测：覆写后 630 钉死，
+            // 删掉后跟随到 1263）。
             if (widget.options) widget.options.getMinHeight = () => uiHeight(self._h3sdEditor);
             widget.element = container;
             self._h3sdDomWidget = widget;
