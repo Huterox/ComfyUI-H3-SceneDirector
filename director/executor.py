@@ -44,6 +44,7 @@ from .colorlock import (stats as cl_stats, match_smooth as cl_match,
 from . import plan as PL
 from . import vram as VRAM
 from . import budget as B
+from .status import emit_log
 
 _LOG = logging.getLogger("h3_scenedirector")
 
@@ -374,6 +375,9 @@ def run_chain(model, vae, audio_vae, segments_raw, story_cond, sampler, sigmas,
               len(globals_rows), len(assets), float(cfg),
               "引导采样" if negative is not None else "仅正条件",
               "开" if continuity else "关")
+    emit_log("run %s 开始：%d 段（%d 新渲染 / %d 缓存），衔接 %s"
+             % (run, len(segs), n_render, n_cached,
+                "开" if continuity else "关"))
 
     # 显存规划：按本次 run 的最大渲染窗口估算采样激活余量，采样期间抬高
     # 全局保留量压低 DiT 权重驻留；同时修正 H3 VAE 的 decode 内存估算
@@ -395,6 +399,8 @@ def run_chain(model, vae, audio_vae, segments_raw, story_cond, sampler, sigmas,
             duration_s=dur_max)
         _LOG.info("显存规划：采样余量 %.1f GB（窗口 %d 帧, %dx%d, 参考图 %d 张）",
                   reserve_bytes / 1024**3, window, width, height, n_imgs)
+        emit_log("显存规划：采样余量 %.1f GB（窗口 %d 帧 %dx%d）"
+                 % (reserve_bytes / 1024**3, window, width, height))
 
     all_images, all_audio = [], None
     seg_meta, info_lines = [], []
@@ -574,6 +580,7 @@ def run_chain(model, vae, audio_vae, segments_raw, story_cond, sampler, sigmas,
             "段 %d [%s]: %d 帧 / %.2fs, seed %d, trim %d, 音画漂移 %.1fms [%s]"
             % (i + 1, sp.task, frames, frames / float(P.FPS), seg_seed, trim,
                drift, tag))
+        emit_log(info_lines[-1])
 
     meta_out = C.new_meta(run, g_hash, global_prompt, globals_rows,
                           P.assets_fp(assets), base_seed, seg_meta)
@@ -599,6 +606,7 @@ def run_chain(model, vae, audio_vae, segments_raw, story_cond, sampler, sigmas,
         header += "\n全局设定: " + (global_block[:60] + "…" if len(global_block) > 60 else global_block)
     info = header + "\n" + "\n".join(info_lines)
     _LOG.info("%s", header)
+    emit_log(header.split("\n")[0] + " —— 完成")
 
     return (torch.cat(all_images, dim=0), all_audio,
             C.contact_sheet(all_images), info)

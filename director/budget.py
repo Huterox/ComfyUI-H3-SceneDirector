@@ -25,6 +25,8 @@ import math
 
 import comfy.model_management as mm
 
+from .status import emit_log
+
 _LOG = logging.getLogger("h3_scenedirector.budget")
 
 # 采样激活估算系数（bf16，按 H3 forward 的单层峰值：残差 h + FFN 中间态
@@ -76,6 +78,8 @@ def reserved_vram(extra_bytes):
         mm.EXTRA_RESERVED_VRAM = want
         _LOG.info("显存规划：采样保留 %.1f GB（原 %.1f GB）",
                   want / 1024**3, old / 1024**3)
+        emit_log("显存规划：采样保留 %.1f GB（权重驻留压低，缺口走异步预取）"
+                 % (want / 1024**3))
     try:
         yield
     finally:
@@ -95,6 +99,8 @@ def fix_vae_decode_estimate(vae):
     vae._h3_decode_estimate_fixed = True
     _LOG.info("显存规划：H3 VAE decode 估算修正为 %.1f GB（流式分块实测口径）",
               _VAE_DECODE_REAL / 1024**3)
+    emit_log("显存规划：VAE 解码内存估算修正为 %.1f GB（内建滑窗流式口径，"
+             "免去每段 20G 权重往返）" % (_VAE_DECODE_REAL / 1024**3))
     return True
 
 
@@ -111,4 +117,5 @@ def unload_clip(clip):
             if loaded.model_unload() and loaded in mm.current_loaded_models:
                 mm.current_loaded_models.remove(loaded)
             _LOG.info("显存规划：CLIP 已卸载（文本条件编码完毕）")
+            emit_log("显存规划：CLIP 已卸载（编码完毕，采样循环不再使用）")
             return

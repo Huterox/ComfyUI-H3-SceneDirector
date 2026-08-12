@@ -17,6 +17,7 @@ import { createCards } from "./cards.js";
 import { createExtras } from "./extras.js";
 import { createEnhancer } from "./enhance.js";
 import { createVideoEditor } from "./video.js";
+import { createLogs } from "./logs.js";
 
 // 皮肤注入（import.meta.url 相对解析，不硬编码包路径）
 const css = document.createElement("link");
@@ -286,6 +287,8 @@ function initEditor(node) {
     ed.enhancer = createEnhancer(ed, { api });
     ed.els.root.appendChild(ed.enhancer.element);
     ed.videoEditor = createVideoEditor(ed, { api });
+    ed.logs = createLogs(ed, { api });
+    ed.els.root.appendChild(ed.logs.element);      // 运行日志条：沉底
 
     // 模式主区渲染
     ed.render = () => {
@@ -398,6 +401,7 @@ app.registerExtension({
         const origRemoved = nodeType.prototype.onRemoved;
         nodeType.prototype.onRemoved = function () {
             try { this._h3sdEditor?.extras?.dispose?.(); } catch (e) { /* 忽略 */ }
+            try { this._h3sdEditor?.logs?.dispose?.(); } catch (e) { /* 忽略 */ }
             return origRemoved?.apply(this, arguments);
         };
     },

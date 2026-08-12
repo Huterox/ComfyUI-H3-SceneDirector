@@ -284,3 +284,17 @@
 
 /* 全局面板强制可见：保底一排可用高度，再也不被折叠没 */
 .mmx-host .sd2-global { flex: 0 1 auto; min-height: 148px; max-height: 55%; overflow-y: auto; }
+
+/* ---------- 运行日志条 ---------- */
+.mmx-host .sd2-log { flex: none; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 6px; overflow: hidden; }
+.mmx-host .sd2-log-head { display: flex; align-items: center; gap: 8px;
+    padding: 3px 8px; border-bottom: 1px solid var(--line); }
+.mmx-host .sd2-log-vram { color: var(--live); font-size: 11px;
+    font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mmx-host .sd2-log-body { height: 96px; overflow-y: auto; overflow-x: auto;
+    padding: 4px 8px; background: var(--screen);
+    font: 11px/1.6 "JetBrains Mono", "SFMono-Regular", Consolas, monospace; }
+.mmx-host .sd2-log-line { white-space: nowrap; color: var(--text); }
+.mmx-host .sd2-log-line.dim { color: var(--dimmer); }
+.mmx-host .sd2-btn.mini { padding: 0 8px; font-size: 11px; line-height: 18px; }
