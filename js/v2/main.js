@@ -16,6 +16,7 @@ import { createStore } from "./store.js";
 import { createCards } from "./cards.js";
 import { createExtras } from "./extras.js";
 import { createEnhancer } from "./enhance.js";
+import { createVideoEditor } from "./video.js";
 
 // 皮肤注入（import.meta.url 相对解析，不硬编码包路径）
 const css = document.createElement("link");
@@ -244,6 +245,7 @@ function initEditor(node) {
     ed.els.root.appendChild(ed.extras.statusEl);   // 状态行
     ed.enhancer = createEnhancer(ed, { api });
     ed.els.root.appendChild(ed.enhancer.element);
+    ed.videoEditor = createVideoEditor(ed, { api });
 
     // 模式主区渲染
     ed.render = () => {

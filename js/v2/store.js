@@ -33,6 +33,8 @@ function defaultState(taskLabel) {
         output: { aspectRatio: "16:9 (宽屏)", megapixels: 1.0,
                   continuityEnabled: true, continuityOverlapFrames: 22,
                   audioMode: "generate", exportMode: "all" },
+        video: { fileName: "", subfolder: "", frames: 0 },   // v2v/rv2v 源片
+        videoClips: [],   // 多段拼接：{id, videoFile, subfolder, logicalStart, logicalEnd}
         segments: [newSegment(5.0)],
         shots: [],
         runSelectEnabled: false,
@@ -103,7 +105,9 @@ export function createStore({ node, app, api }) {
         if (widthW) widthW.value = width;
         if (heightW) heightW.value = height;
         if (refMaxW) refMaxW.value = Math.max(width, height);
-        const total = isFl2v()
+        const total = isVideoMode()
+            ? (state.video?.frames || 0)
+            : isFl2v()
             ? (state.shots || []).reduce((a, s) => a + (setDuration(s.durationSec).frameCount), 0)
             : (state.segments || []).reduce((a, s) => a + (s.frameCount || 0), 0);
         if (totalW) totalW.value = Math.max(5, total);
@@ -116,11 +120,15 @@ export function createStore({ node, app, api }) {
     };
 
     function commit(opts = {}) {
-        // 规范化：帧数贴合网格（输入秒数已在组件层 snap，这里是兜底）
-        for (const s of state.segments) {
-            const d = setDuration(s.durationSec);
-            s.durationSec = d.durationSec;
-            s.frameCount = d.frameCount;
+        // 规范化：帧数贴合网格（输入秒数已在组件层 snap，这里是兜底）。
+        // 视频模式的段不管——start/length/durationSec 由 video.js 精确维护，
+        // 套网格会让 frameCount 与源区间漂移。
+        if (!isVideoMode()) {
+            for (const s of state.segments) {
+                const d = setDuration(s.durationSec);
+                s.durationSec = d.durationSec;
+                s.frameCount = d.frameCount;
+            }
         }
         for (const sh of state.shots) sh.durationSec = setDuration(sh.durationSec).durationSec;
         if (!AUDIO_MODES.includes(state.output.audioMode)) state.output.audioMode = "generate";

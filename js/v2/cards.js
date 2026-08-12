@@ -561,11 +561,7 @@ export function createCards(ed, { api }) {
         globalArea.innerHTML = "";
 
         if (mode === "v2v" || mode === "rv2v") {
-            const ph = el("div", "sd2-panel");
-            ph.appendChild(el("div", "sd2-sec",
-                "v2v / rv2v 视频编辑（舞台播放器 + 画布时间轴 + 智能分割）在二期交付——"
-                + "当前请用 t2v / i2v / r2v / fl2v。"));
-            main.appendChild(ph);
+            ed.videoEditor.render(main, globalArea);
             return;
         }
 

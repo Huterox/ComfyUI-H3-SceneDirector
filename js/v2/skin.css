@@ -240,3 +240,28 @@
 /* 容器吃满 DOM widget 的分配高度（Director 同款：min-height 变量 + height:100%） */
 .mmx-host { height: 100%; box-sizing: border-box; display: flex; flex-direction: column; }
 .mmx-host > .sd2 { flex: 1 1 auto; min-height: 0; }
+
+/* ---------- v2v/rv2v 视频编辑器（二期） ---------- */
+.mmx-host .sd2-vup { align-items: center; justify-content: center; text-align: center;
+    min-height: 180px; border: 1px dashed var(--line2); cursor: pointer; color: var(--dim); }
+.mmx-host .sd2-vup:hover, .mmx-host .sd2-vup.drop { border-color: var(--accent); color: var(--text); }
+.mmx-host .sd2-vstage { background: var(--screen); border: 1px solid var(--line);
+    border-radius: 6px; overflow: hidden; }
+.mmx-host .sd2-vstage video { width: 100%; max-height: 340px; object-fit: contain;
+    display: block; background: #000; }
+.mmx-host .sd2-vcontrols { display: flex; align-items: center; gap: 8px; padding: 6px 10px;
+    background: var(--panel); border-top: 1px solid var(--line); }
+.mmx-host .sd2-vcontrols .tc { font-variant-numeric: tabular-nums; }
+.mmx-host .sd2-vcontrols .seek { flex: 1; accent-color: var(--accent2); }
+.mmx-host .sd2-vtools { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.mmx-host .sd2-vtrack-wrap { display: flex; flex-direction: column; gap: 6px; }
+.mmx-host .sd2-vtrack { position: relative; height: 52px; background: var(--screen);
+    border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.mmx-host .sd2-vseg { position: absolute; top: 6px; bottom: 6px; background: #1a2233;
+    border: 1px solid #2f4a5f; border-radius: 4px; cursor: pointer; overflow: hidden; }
+.mmx-host .sd2-vseg.sel { border-color: var(--accent); background: #1e3a5c; }
+.mmx-host .sd2-vseg .cap { font-size: 10px; color: #9fb2d8; padding: 2px 6px;
+    display: inline-block; white-space: nowrap; }
+.mmx-host .sd2-vseg .grip { position: absolute; right: 0; top: 0; bottom: 0; width: 8px;
+    cursor: col-resize; }
+.mmx-host .sd2-vseg .grip:hover { background: rgba(77, 163, 255, .35); }
