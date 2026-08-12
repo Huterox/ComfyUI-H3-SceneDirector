@@ -161,6 +161,7 @@ class H3SceneDirectorChain:
                 "uniform_window": ("BOOLEAN", {"default": False}),
                 "color_lock": ("BOOLEAN", {"default": False}),
                 "vram_cleanup": ("BOOLEAN", {"default": False}),
+                "vram_budget": ("BOOLEAN", {"default": True}),
             },
             "optional": {
                 "negative": ("CONDITIONING",),
@@ -180,14 +181,16 @@ class H3SceneDirectorChain:
               width, height, seed, context_length, audio_context_length,
               encode_mode, anchor_mode, audio_mode, crop, cfg, cache_tag,
               continuity=True, seam_blend=True, uniform_window=False,
-              color_lock=False, vram_cleanup=False, negative=None, unique_id=None):
+              color_lock=False, vram_cleanup=False, vram_budget=True,
+              negative=None, unique_id=None):
         return executor.run_chain(
             model, vae, audio_vae, segments, story_cond, sampler, sigmas,
             width, height, seed, context_length, audio_context_length,
             encode_mode, anchor_mode, audio_mode, crop, cfg, cache_tag,
             uniform_window=uniform_window, color_lock=color_lock,
             negative=negative, continuity=continuity, seam_blend=seam_blend,
-            vram_cleanup=vram_cleanup, node_id=unique_id)
+            vram_cleanup=vram_cleanup, node_id=unique_id,
+            vram_budget=vram_budget)
 
 
 class H3SceneDirectorLatentTemplate:
