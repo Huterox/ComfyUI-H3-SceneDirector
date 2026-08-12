@@ -155,15 +155,17 @@ def _encode_story_impl(clip, vae, audio_vae, segments_raw, width, height,
     run, run_nonce, global_prompt, globals_rows, assets, segs = P.parse_payload(segments_raw)
     if not segs:
         raise ValueError("H3SceneDirector: 载荷里没有任何段")
-    global_block = P.compose_global(global_prompt, globals_rows, assets)
+    # v5：全局块与全局参考块只算常驻卡；按需卡躺在库里，由段 refs 引用挂载
+    pinned = P.pinned_assets(assets)
+    global_block = P.compose_global(global_prompt, globals_rows, pinned)
 
     # 全局素材序号（按 kind 分别编号，段级接在后面）
-    n_pic = sum(1 for a in assets if a["image"] and a.get("kind", "image") == "image")
-    n_vid = sum(1 for a in assets if a["image"] and a.get("kind") == "video")
-    n_aud = sum(1 for a in assets if a["image"] and a.get("kind") == "audio")
+    n_pic = sum(1 for a in pinned if a["image"] and a.get("kind", "image") == "image")
+    n_vid = sum(1 for a in pinned if a["image"] and a.get("kind") == "video")
+    n_aud = sum(1 for a in pinned if a["image"] and a.get("kind") == "audio")
 
     global_refs = encode_asset_refs(
-        vae, audio_vae, width, height, assets,
+        vae, audio_vae, width, height, pinned,
         video_loader=_video_full, audio_loader=_audio_full)
     seg_cache = {}
 
@@ -178,7 +180,9 @@ def _encode_story_impl(clip, vae, audio_vae, segments_raw, width, height,
 
     conds = []
     for i, seg in enumerate(segs):
-        seg_assets = seg.get("assets") or []
+        # 段实际生效资产 = 常驻 + refs 解析 + 段级内嵌；清单行与参考块按此
+        # 顺序（refs 卡插在锚点的同时也进本段参考块，即"@ 引用即挂载"）
+        seg_assets = P.seg_effective_assets(assets, seg)[len(pinned):]
         seg_extra = P.compose_seg_extra(seg_assets, (n_pic, n_vid, n_aud))
         full_prompt = P.compose_prompt(global_block, seg["prompt"], seg_extra)
 
@@ -361,8 +365,9 @@ def _run_chain_impl(model, vae, audio_vae, segments_raw, story_cond, sampler,
                            P.sampling_fp(sampler, sigmas, negative, cfg),
                            cache_tag=str(cache_tag or "").strip(), seed=seed,
                            continuity=continuity, seam_blend=seam_blend)
-    hashes = [P.seg_hash(i, s) for i, s in enumerate(segs)]
-    global_block = P.compose_global(global_prompt, globals_rows, assets)
+    hashes = [P.seg_hash(i, s, assets) for i, s in enumerate(segs)]
+    global_block = P.compose_global(global_prompt, globals_rows,
+                                    P.pinned_assets(assets))
     run_plan = PL.build_plan(run, segs, hashes)
 
     # 未勾选段必须已有缓存，否则给出引导（选择运行的固有约束）
@@ -590,7 +595,8 @@ def _run_chain_impl(model, vae, audio_vae, segments_raw, story_cond, sampler,
         emit_log(info_lines[-1])
 
     meta_out = C.new_meta(run, g_hash, global_prompt, globals_rows,
-                          P.assets_fp(assets), base_seed, seg_meta)
+                          P.assets_fp(P.pinned_assets(assets)),
+                          base_seed, seg_meta)
     # 记录校色/亮度开关状态：缓存段的可看工件是按这个状态落盘的，
     # 下次开关翻转时据此重存工件（不动 latent，不重渲）
     meta_out["color_lock"] = bool(color_lock)

@@ -85,7 +85,7 @@ def new_meta(run, g_hash, global_prompt, globals_rows, assets_fps,
              base_seed, seg_meta):
     """组装 meta.json 的内容；assets_fps 由调用方（引擎）算好传入。"""
     return {
-        "version": 2, "schema": 4, "run": run, "global_hash": g_hash,
+        "version": 2, "schema": 5, "run": run, "global_hash": g_hash,
         "global_prompt": global_prompt, "globals": globals_rows,
         "assets_fp": assets_fps,
         "base_seed": base_seed, "updated": time.time(),

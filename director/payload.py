@@ -3,26 +3,34 @@
 本模块只允许纯函数——不 import ComfyUI 的任何东西——这样
 "什么改动会让缓存段失效"这条规则就可以离线单测。
 
-载荷 schema v4（Director 1.1 工作台 JSON）：
+载荷 schema v5（资产库 + 引用语义）：
 
-  run           缓存目录名（一次 run = 一个场景）
+  run           缓存目录名（一次 run = 一个场景 = 一个项目）
   run_nonce     手动全链作废计数器
   global_prompt 设定表里的自由文本"通用"行
   globals       [{category, content}] 带标签的场景设定行
-  assets        [{category, name, image, subfolder, note, kind}] 场景资产卡；
-                kind ∈ image(默认)/video/audio；带文件的卡成为 H3 参考块
-                注入每一段（身份锚），纯文本卡并入全局文本块
-  segments      [{duration, prompt, nonce, assets, enabled, task,
+  assets        [{category, name, image, subfolder, note, kind, pinned}]
+                资产库卡片；kind ∈ image(默认)/video/audio。
+                pinned（缺省 true，对齐旧行为）= 常驻卡：成为 H3 参考块
+                注入每一段（身份锚）且并入全局文本块；
+                pinned=false = 按需卡：躺在库里不进任何段，等待段 refs 引用。
+  segments      [{duration, prompt, nonce, refs, assets, enabled, task,
                   first_frame, last_frame, source, audio_mode}]
-                逐动作行。v4 新增（全部可选）：
-                enabled     选择运行（默认 true；false = 用缓存填充）
-                task        t2v/i2v/fl2v/r2v/v2v/rv2v（缺省按素材推断）
-                first_frame {image, subfolder} 段级首帧（i2v/fl2v）
-                last_frame  {image, subfolder} 段级尾帧（fl2v）
-                source      {video, subfolder, start, end} v2v 源片段（秒）
-                audio_mode  generate(默认)/original/mute（v2v 声音模式）
+                refs          ["角色·沈青霜", …] 引用库里的按需卡
+                              （@ 引用即挂载：插锚点 + 进本段参考块）
+                assets        段级内嵌卡（旧字段，v3 UI 不再产生，保留兼容）
+                enabled       选择运行（默认 true；false = 用缓存填充）
+                task          t2v/i2v/fl2v/r2v/v2v/rv2v（缺省按素材推断）
+                first_frame   {image, subfolder} 段级首帧（i2v/fl2v）
+                last_frame    {image, subfolder} 段级尾帧（fl2v）
+                source        {video, subfolder, start, end} v2v 源片段（秒）
+                audio_mode    generate(默认)/original/mute（v2v 声音模式）
 
-缓存哈希标签为 "sd5"：schema v4 的段字段进入段哈希。语义发生变化的
+段实际生效资产 = 常驻卡（库顺序）+ refs 解析（引用顺序）+ 段级内嵌卡，
+三类在提示词清单和参考块里的编号都按此顺序连续排列（按 kind 分别编：
+<Picture N> / <Video K> / <Audio J>）。
+
+缓存哈希标签为 "sd6"：schema v5 的 pinned/refs 进入哈希。语义发生变化的
 引擎修正会递进标签，旧缓存自动作废。
 """
 
@@ -33,7 +41,7 @@ import os
 import folder_paths
 
 FPS = 24
-SCHEMA = 4
+SCHEMA = 5
 
 TASK_KEYS = ("t2v", "i2v", "fl2v", "r2v", "v2v", "rv2v")
 AUDIO_MODES = ("generate", "original", "mute")
@@ -84,9 +92,10 @@ def norm_globals(items):
 
 
 def norm_assets(items, fallback_category="角色"):
-    """规范化资产卡 {category, name, image, subfolder, note, kind}。
+    """规范化资产卡 {category, name, image, subfolder, note, kind, pinned}。
     文件、名、备注三者至少占一才算有效卡。kind: image(默认)/video/audio，
-    image 字段同时充当文件名字段（历史命名，视频/音频卡也用它）。"""
+    image 字段同时充当文件名字段（历史命名，视频/音频卡也用它）。
+    pinned 缺省 true（对齐旧版"全局资产全量注入"行为）；v3 UI 始终显式给出。"""
     out = []
     for a in items or []:
         if not isinstance(a, dict):
@@ -101,6 +110,7 @@ def norm_assets(items, fallback_category="角色"):
             "subfolder": str(a.get("subfolder", "") or "").strip(),
             "note": str(a.get("note", "") or "").strip(),
             "kind": kind,
+            "pinned": bool(a.get("pinned", True)),
         }
         if card["image"] or card["name"] or card["note"]:
             out.append(card)
@@ -137,13 +147,30 @@ def _norm_source(raw):
             "start": start, "end": end}
 
 
-def infer_task(seg):
+def _norm_refs(items):
+    """规范化段 refs：["类别·名字", …] 字符串列表，剔空去重保序。"""
+    out, seen = [], set()
+    for r in items or []:
+        key = str(r or "").strip()
+        if key and key not in seen:
+            seen.add(key)
+            out.append(key)
+    return out
+
+
+def infer_task(seg, library=None):
     """缺省任务推断：源片段→v2v（有参考资产则 rv2v）；首尾帧→fl2v；
-    仅首帧→i2v；有文件资产→r2v；否则 t2v。"""
+    仅首帧→i2v；有文件资产→r2v；否则 t2v。
+
+    段的 refs 引用（v5）与段级内嵌卡一样算"有参考资产"（@ 引用即挂载）；
+    常驻卡不算——全局锚定是引擎行为，不改变用户眼中的任务模式
+    （对齐旧版全局资产不入推断的行为）。"""
     explicit = str(seg.get("task", "") or "").strip().lower()
     if explicit in TASK_KEYS:
         return explicit
     has_refs = any(a.get("image") for a in seg.get("assets") or [])
+    if not has_refs and library and seg.get("refs"):
+        has_refs = any(a.get("image") for a in resolve_refs(library, seg["refs"]))
     if seg.get("source"):
         return "rv2v" if has_refs else "v2v"
     if seg.get("first_frame") and seg.get("last_frame"):
@@ -189,6 +216,7 @@ def parse_payload(raw):
         prompt = str(item.get("prompt", "") or "").strip()
         nonce = str(item.get("nonce", "") or "")
         seg = {"duration": dur, "prompt": prompt, "nonce": nonce,
+               "refs": _norm_refs(item.get("refs")),
                "assets": norm_assets(item.get("assets"),
                                      fallback_category="场景"),
                "enabled": bool(item.get("enabled", True)),
@@ -197,10 +225,45 @@ def parse_payload(raw):
                "source": _norm_source(item.get("source"))}
         am = str(item.get("audio_mode", "") or "").strip().lower()
         seg["audio_mode"] = am if am in AUDIO_MODES else "generate"
-        seg["task"] = infer_task(seg)
+        seg["task"] = infer_task(seg, assets)
         if prompt or seg["source"]:
             segments.append(seg)
     return run, run_nonce, global_prompt, globals_rows, assets, segments
+
+
+# ---------------------------------------------------------------------------
+# 资产库解析（常驻 / 引用）
+# ---------------------------------------------------------------------------
+
+def pinned_assets(assets):
+    """常驻卡：注入每一段的那些。"""
+    return [a for a in assets or [] if a.get("pinned", True)]
+
+
+def asset_key(a):
+    """卡的引用键："类别·名字"（类别为空时只用名字，与清单标签同形）。"""
+    return "·".join(x for x in (a.get("category", ""), a.get("name", "")) if x)
+
+
+def resolve_refs(assets, refs):
+    """把段 refs 的引用键解析为库资产卡；找不到的键静默跳过（前端会亮黄）。"""
+    out, seen = [], set()
+    for key in refs or []:
+        for a in assets or []:
+            if asset_key(a) == key and key not in seen:
+                seen.add(key)
+                out.append(a)
+                break
+    return out
+
+
+def seg_effective_assets(assets, seg):
+    """段实际生效资产：常驻卡 + refs 解析（跳过已被常驻覆盖的键）+ 段级内嵌卡。"""
+    pinned = pinned_assets(assets)
+    covered = {asset_key(a) for a in pinned}
+    refs = [a for a in resolve_refs(assets, seg.get("refs"))
+            if asset_key(a) not in covered]
+    return pinned + refs + (seg.get("assets") or [])
 
 
 # ---------------------------------------------------------------------------
@@ -209,8 +272,9 @@ def parse_payload(raw):
 
 def compose_global(global_prompt, globals_rows, assets):
     """场景级文本块：先是自由文本"通用"行，再是带标签的设定行，
-    最后是资产清单——让提示词明确说明每个参考素材是什么。
-    图片编 <Picture N>，视频编 <Video K>，音频编 <Audio J>（官方序号）。"""
+    最后是常驻资产清单——让提示词明确说明每个参考素材是什么。
+    图片编 <Picture N>，视频编 <Video K>，音频编 <Audio J>（官方序号）。
+    调用方传进来的 assets 必须已经是常驻子集（pinned_assets）。"""
     lines = []
     if global_prompt:
         lines.append(global_prompt.strip())
@@ -247,7 +311,7 @@ def _asset_roster(assets, offsets):
 
 
 def compose_seg_extra(seg_assets, offsets):
-    """段级清单行；序号接在全局素材之后。offsets = (pic, vid, aud)。"""
+    """段级清单行；序号接在常驻素材之后。offsets = (pic, vid, aud)。"""
     roster, _ = _asset_roster(seg_assets, offsets)
     return ("本段资产：" + roster) if roster else ""
 
@@ -286,11 +350,17 @@ def assets_fp(assets):
     return fps
 
 
-def seg_hash(index, seg):
-    """单段内容的身份标识（含段级资产与 v4 任务字段）。
-    enabled（选择运行）不入哈希——它决定跑不跑，不改变内容。"""
-    parts = ["sd5", index, seg["duration"], seg["prompt"], seg["nonce"],
+def seg_hash(index, seg, library=None):
+    """单段内容的身份标识（含 refs 引用与 v5 任务字段）。
+    enabled（选择运行）不入哈希——它决定跑不跑，不改变内容。
+    library 给定时把 refs 解析到的卡的内容指纹一并算入（改卡即级联）。"""
+    parts = ["sd6", index, seg["duration"], seg["prompt"], seg["nonce"],
              seg.get("task", "t2v"), seg.get("audio_mode", "generate")]
+    refs = seg.get("refs") or []
+    if refs:
+        parts.append(list(refs))
+        if library is not None:
+            parts.extend(assets_fp(resolve_refs(library, refs)))
     if seg.get("assets"):
         parts.append([[a["category"], a["name"], a["note"], a.get("kind", "image")]
                       for a in seg["assets"]])
@@ -315,13 +385,16 @@ def global_hash(run_nonce, width, height, context_length, audio_context_length,
     所以换了 UNET 或 LoRA 之后改一下这个 tag，缓存就不会误发旧条目。
     seed 只在显式指定（>=0）时入指纹；-1（随机/沿用 meta 的 base_seed）
     不入，否则每次运行都会无谓地全链重渲。
-    continuity/seam_blend 改变交付结果，入指纹；vram 清理不改变内容，不入。"""
-    parts = ["sd5", run_nonce, width, height, context_length, audio_context_length,
+    continuity/seam_blend 改变交付结果，入指纹；vram 清理不改变内容，不入。
+    v5 起只有常驻卡进全局哈希：按需卡不进任何段，动它不该级联全链
+    （它经由各段 refs 指纹影响对应段）。"""
+    parts = ["sd6", run_nonce, width, height, context_length, audio_context_length,
              encode_mode, anchor_mode, audio_mode, crop,
              bool(continuity), bool(seam_blend)]
-    if globals_rows or assets:
-        parts.append(compose_global(global_prompt, globals_rows, assets))
-        parts.extend(assets_fp(assets))
+    pinned = pinned_assets(assets or [])
+    if globals_rows or pinned:
+        parts.append(compose_global(global_prompt, globals_rows, pinned))
+        parts.extend(assets_fp(pinned))
     elif global_prompt:
         parts.append(global_prompt)
     parts.append(sampling_fp)
@@ -395,7 +468,7 @@ def _d_ref_to_asset(item, kind, seen):
     card = {"category": "参考", "name": str(item.get("name", "") or "").strip()
             or rel.rsplit("/", 1)[-1].rsplit(".", 1)[0],
             "image": rel.replace("\\", "/"),
-            "subfolder": "", "note": "", "kind": kind}
+            "subfolder": "", "note": "", "kind": kind, "pinned": True}
     # imageFile 带相对路径时拆出 subfolder（与输入目录约定一致）
     if "/" in card["image"]:
         card["subfolder"], card["image"] = card["image"].rsplit("/", 1)
@@ -501,6 +574,7 @@ def parse_director(timeline_data, task_type, global_prompt, run):
                 dur = 5.0
             seg = {"duration": dur, "prompt": str(sh.get("prompt", "") or "").strip(),
                    "nonce": str(sh.get("id", "") or ""),
+                   "refs": [],
                    "assets": [], "enabled": _enabled(i, sh.get("id")),
                    "first_frame": _d_frame_ref(sh.get("startImage")),
                    "last_frame": _d_frame_ref(sh.get("endImage")),
@@ -524,6 +598,7 @@ def parse_director(timeline_data, task_type, global_prompt, run):
             st = _task_key_from_label(s.get("taskType") or task)
             seg = {"duration": round(dur, 3), "prompt": str(s.get("prompt", "") or "").strip(),
                    "nonce": str(s.get("id", "") or ""),
+                   "refs": [],
                    "assets": [], "enabled": _enabled(i, s.get("id")),
                    "first_frame": _d_frame_ref(s.get("genImage")),
                    "last_frame": None, "source": None,

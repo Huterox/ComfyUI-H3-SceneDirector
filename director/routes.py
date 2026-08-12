@@ -335,7 +335,10 @@ async def status(request):
     rows = body.get("segments") or []
     global_prompt = str(body.get("global_prompt", "") or "").strip()
     globals_rows = P.norm_globals(body.get("globals"))
-    afp = P.assets_fp(P.norm_assets(body.get("assets")))
+    norm_assets = P.norm_assets(body.get("assets"))
+    # v5 口径：只有常驻卡的变化算"全局变了"；按需卡经由段 refs 指纹
+    # 只级联引用它的段（与引擎 g_hash/seg_hash 的判定保持一致）
+    afp = P.assets_fp(P.pinned_assets(norm_assets))
     global_changed = bool(meta) and (
         (meta.get("global_prompt") or "") != global_prompt
         or (meta.get("globals") or []) != globals_rows
@@ -347,7 +350,7 @@ async def status(request):
             row = {}
         m = cached[i] if i < len(cached) else None
         try:
-            row_hash = P.seg_hash(i, row)
+            row_hash = P.seg_hash(i, row, norm_assets)
         except KeyError:
             # 畸形行（缺 duration 等字段，比如旧前端缓存页的轮询）：
             # 按未缓存处理，绝不让状态路由 500
