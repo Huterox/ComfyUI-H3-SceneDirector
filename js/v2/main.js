@@ -47,8 +47,9 @@ function ensureWidth(node) {
     ed.container.style.width = w + "px";
 }
 
-// 任务模式 -> UNET 模型联动（沿 Chain 的 MODEL 输入找 UNETLoader，兼容中间隔补丁节点）
-function linkModel(node, modeKey) {
+// 任务模式 -> UNET 模型联动（沿 Chain 的 MODEL 输入找 UNETLoader，兼容中间隔补丁节点）。
+// 两个模型位由输出条的「模型联动」下拉配置，随工作流保存（output.modelGen/modelRef）。
+function linkModel(node, modeKey, store) {
     try {
         const g = app.graph;
         const nodes = g?._nodes || [];
@@ -64,11 +65,13 @@ function linkModel(node, modeKey) {
                 src = byId(g.links[inp.link]?.origin_id);
                 hops += 1;
             }
-            const want = REF_MODELS[REF_TASKS.has(modeKey) ? "ref" : "gen"];
+            const out = store?.get?.().output || {};
+            const want = REF_TASKS.has(modeKey)
+                ? (out.modelRef || REF_MODELS.ref) : (out.modelGen || REF_MODELS.gen);
             const unetW = src?.widgets?.find((w) => w.name === "unet_name");
-            if (unetW && unetW.value !== want) unetW.value = want;
+            if (unetW && unetW.options?.values?.includes?.(want) !== false) unetW.value = want;
             const tagW = chain.widgets?.find((w) => w.name === "cache_tag");
-            if (tagW) tagW.value = REF_TASKS.has(modeKey) ? "ref2va" : "fl2va";
+            if (tagW) tagW.value = want.replace(/^minimax_h3_|\.safetensors$/g, "");
         }
     } catch (e) { /* 联动失败不影响编辑 */ }
 }
@@ -89,7 +92,7 @@ function buildSkeleton(ed) {
             if (ed.store.mode() === key) return;
             ed.store.setMode(key);      // 每模式独立数据舱：收起当前、切出目标
             ed.selectedIndex = 0;
-            linkModel(ed.node, key);
+            linkModel(ed.node, key, ed.store);
         });
         tabs.appendChild(b);
     }
@@ -198,6 +201,45 @@ function buildSkeleton(ed) {
     au.addEventListener("change", () => { o().audioMode = au.value; ed.store.commit(); });
     out.appendChild(au);
     out.appendChild(el("span", "sp"));
+    // 模型联动：两系模型位（切模式自动换 UNETLoader 的 unet_name）
+    const modelOpts = (() => {
+        try {
+            const nodes = app.graph?._nodes || [];
+            const chain = nodes.find((n) => n.comfyClass === "H3SceneDirectorChain");
+            const link = chain?.inputs?.[0]?.link != null ? g_links(app.graph, chain.inputs[0].link) : null;
+            let src = link ? byId(app.graph, link.origin_id) : null;
+            let hops = 0;
+            while (src && src.type !== "UNETLoader" && hops < 4) {
+                const inp = src.inputs?.find((i) => i.link != null && /MODEL/i.test(i.type || ""));
+                if (!inp) break;
+                src = byId(app.graph, g_links(app.graph, inp.link)?.origin_id);
+                hops += 1;
+            }
+            const vals = src?.widgets?.find((w) => w.name === "unet_name")?.options?.values;
+            return Array.isArray(vals) && vals.length ? vals : null;
+        } catch (e) { return null; }
+        function g_links(g, id) { return g.links[id]; }
+        function byId(g, id) { return (g._nodes || []).find((n) => String(n.id) === String(id)); }
+    })();
+    const mkModelSel = (label, field, fallback) => {
+        out.appendChild(el("span", "lbl", label));
+        const sel = el("select", "sd2-inp model");
+        const opts = modelOpts || [fallback];
+        for (const v of opts) sel.appendChild(new Option(v.replace(/^minimax_h3_|\.safetensors$/g, ""), v));
+        const cur = o()[field] || fallback;
+        if (![...sel.options].some((x) => x.value === cur)) sel.appendChild(new Option(cur, cur));
+        sel.value = cur;
+        sel.title = label + "（切模式时自动换 UNETLoader 的模型）";
+        sel.addEventListener("change", () => {
+            o()[field] = sel.value;
+            ed.store.commit();
+            linkModel(ed.node, ed.store.mode(), ed.store);
+        });
+        out.appendChild(sel);
+        return sel;
+    };
+    mkModelSel("生成系模型", "modelGen", REF_MODELS.gen);
+    mkModelSel("参考系模型", "modelRef", REF_MODELS.ref);
     const liveBtn = el("button", "sd2-btn", "实时预览：开");
     liveBtn.addEventListener("click", () => {
         ed.liveOn = !ed.liveOn;
