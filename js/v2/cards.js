@@ -259,7 +259,7 @@ export function createCards(ed, { api }) {
         function maybeMention(textarea) {
             const pos = textarea.selectionStart;
             const before = textarea.value.slice(0, pos);
-            const m = /(?:^|[\s，。；、（(\n])@([\w一-鿿-]{0,12})$/.exec(before);
+            const m = /(?:^|[\s，。；、（(\n])[@＠]([\w一-鿿-]{0,12})$/.exec(before);
             if (!m) { closePop(); return; }
             const q = m[1];
             const items = mentionScope().filter((it) => !q || it.label.includes(q));
@@ -443,19 +443,22 @@ export function createCards(ed, { api }) {
     function mentionItems(i) {
         const s = ed.store.get();
         const items = [];
-        (s.global.refs || []).forEach((r) => {
-            items.push({ label: "图片" + (Number(r.index) + 1), insert: "<Picture " + (Number(r.index) + 1) + ">" });
-        });
+        const pic = (r) => {
+            const n = Number(r.index) + 1;
+            // 条目带了名字就显示出来（图片1 沈青霜），候选一眼能认出是谁
+            const tag = r.name ? " " + r.name : "";
+            items.push({ label: "图片" + n + tag, insert: "<Picture " + n + ">" });
+        };
+        (s.global.refs || []).forEach(pic);
         (s.global.refAudios || []).forEach((r) => {
-            items.push({ label: "音频" + (Number(r.index) + 1), insert: "<Audio " + (Number(r.index) + 1) + ">" });
+            const n = Number(r.index) + 1;
+            items.push({ label: "音频" + n + (r.name ? " " + r.name : ""), insert: "<Audio " + n + ">" });
         });
         (s.global.refVideos || []).forEach((r) => {
-            items.push({ label: "视频" + (Number(r.index) + 1), insert: "<Video " + (Number(r.index) + 1) + ">" });
+            const n = Number(r.index) + 1;
+            items.push({ label: "视频" + n + (r.name ? " " + r.name : ""), insert: "<Video " + n + ">" });
         });
-        const seg = s.segments[i];
-        (seg?.refs || []).forEach((r) => {
-            items.push({ label: "图片" + (Number(r.index) + 1), insert: "<Picture " + (Number(r.index) + 1) + ">" });
-        });
+        (s.segments[i]?.refs || []).forEach(pic);
         return items;
     }
 
