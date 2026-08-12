@@ -28,14 +28,15 @@ _last = {"msg": None}
 def _vram():
     """(used, free, total) GB；拿不到就 (-1, -1, -1)，前端据此不刷新读数。
 
-    free 用 model_management 的口径（含调度记账，贴近"还能用多少"）；
-    total 直接问 torch（字节，权威）——mm.total_vram 是 MB 且只在特定
-    初始化分支赋值，不可直接用。
+    用 torch.cuda.mem_get_info——驱动层物理口径，与 nvidia-smi 一致。
+    不用 mm.get_free_memory：那是 ComfyUI 记账口径，DynamicVRAM 会把
+    offload 到内存的权重算成"可用"，跑任务时与物理占用严重不符。
     """
     try:
         dev = mm.get_torch_device()
-        free = float(mm.get_free_memory(dev))
-        total = float(torch.cuda.get_device_properties(dev).total_memory)
+        free_b, total_b = torch.cuda.mem_get_info(dev)
+        free = float(free_b)
+        total = float(total_b)
         return (round((total - free) / 1024**3, 2),
                 round(free / 1024**3, 2), round(total / 1024**3, 2))
     except Exception:
