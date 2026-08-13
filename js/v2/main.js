@@ -18,7 +18,7 @@
 import { app } from "../../../scripts/app.js";
 import { api } from "../../../scripts/api.js";
 import { el, TASK_LABELS, taskKeyFromLabel, ASPECTS } from "./util.js";
-import { createStore } from "./store.js";
+import { createStore, defaultState } from "./store.js";
 import { createPromptBox } from "./promptbox.js";
 import { createCards } from "./cards.js";
 import { createLibrary } from "./library.js";
@@ -169,12 +169,15 @@ function buildSkeleton(ed) {
     projSel.title = "项目库：一个项目 = 一个场景（分段/资产库/输出设置全量存档），"
         + "项目名即 run 名（缓存目录名）";
     bar.appendChild(projSel);
+    const newBtn = el("button", "sd2-btn", "新建");
+    newBtn.title = "创建一个空白项目并切入（当前场景若未入库会先确认）";
     const saveBtn = el("button", "sd2-btn", "保存");
     saveBtn.title = "把当前工作台全量状态存到项目库（同名覆盖）";
     const saveAsBtn = el("button", "sd2-btn", "另存为");
     saveAsBtn.title = "换个名字存成新项目（当前场景随之改名）";
     const delProjBtn = el("button", "sd2-btn sm danger", "删");
     delProjBtn.title = "从项目库删除当前项目（缓存目录不动）";
+    bar.appendChild(newBtn);
     bar.appendChild(saveBtn);
     bar.appendChild(saveAsBtn);
     bar.appendChild(delProjBtn);
@@ -294,6 +297,35 @@ function buildSkeleton(ed) {
     }
     saveBtn.addEventListener("click", () => saveProject(false));
     saveAsBtn.addEventListener("click", () => saveProject(true));
+    newBtn.addEventListener("click", async () => {
+        const n = window.prompt("新建空白项目名：", "新场景");
+        if (!n || !n.trim()) return;
+        const name = n.trim();
+        const names = [...projSel.options].map((o) => o.value);
+        if (names.includes(name)
+            && !window.confirm("项目「" + name + "」已存在，覆盖为空白项目？")) return;
+        if (projSel.value === CUR
+            && !window.confirm("当前场景未入库，切入新项目会丢弃未保存内容，继续？")) return;
+        // 空白工程（t2v 单空段）直接落库，再整体切入，等价于打开全新空场景
+        const proj = { timeline: defaultState(TASK_LABELS[0]), run: name };
+        try {
+            const r = await api.fetchApi("/h3_scenedirector/project/save", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name, state: proj }),
+            });
+            if (!r.ok) throw new Error("HTTP " + r.status);
+        } catch (e) {
+            console.error("[sd2] 新建项目失败", e);
+            return;
+        }
+        if (ed.store.applyProject(proj)) {
+            linkModel(ed.node, ed.store.mode(), ed.store);
+            pushResolution(ed);
+            ed.selectedIndex = 0;
+        }
+        await refreshProjects();
+    });
     delProjBtn.addEventListener("click", async () => {
         const name = ed.store.resolveRun();
         if (!window.confirm("从项目库删除「" + name + "」？（缓存目录与当前编辑不受影响）")) return;
@@ -424,7 +456,7 @@ function buildSkeleton(ed) {
     out.appendChild(exp);
     root.appendChild(out);
 
-    return { root, bar, tabs, projSel, saveBtn, saveAsBtn, delProjBtn, aiBtn, sum,
+    return { root, bar, tabs, projSel, newBtn, saveBtn, saveAsBtn, delProjBtn, aiBtn, sum,
              addBtn, rerollBtn, selBtn, live, globalArea, main, out, asp, mp, fps,
              cont, ctxN, au, exp, refreshProjects };
 }

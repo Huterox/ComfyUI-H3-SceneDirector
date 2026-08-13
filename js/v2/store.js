@@ -430,3 +430,7 @@ export function createStore({ node, app, api }) {
         },
     };
 }
+
+// 新建空白项目用：默认时间线（t2v，单空段），与 serialize() 的结构兼容
+// （_modes 缺省由 loadModes 兜底）
+export { defaultState };
