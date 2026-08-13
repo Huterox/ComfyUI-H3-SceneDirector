@@ -308,6 +308,11 @@ export function createAutopilot(ed, { api }) {
         hd.appendChild(el("span", "sp"));
         hd.appendChild(el("span", "meta",
             "项目 agent · 与对话改写同一 session · 会话存 SQLite"));
+        const cfg = el("button", "x", "⚙ 服务配置");
+        cfg.type = "button";
+        cfg.title = "LLM 与生图服务的端点/密钥（存服务端，不随工作流外泄）";
+        cfg.addEventListener("click", () => ed.config?.open());
+        hd.appendChild(cfg);
         const x = el("button", "x", "× 关闭");
         x.type = "button";
         x.addEventListener("click", close);
