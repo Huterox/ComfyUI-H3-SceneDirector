@@ -193,6 +193,11 @@ function buildSkeleton(ed) {
         else ed.autopilot?.open();
     });
     bar.appendChild(aiBtn);
+    const cfgBtn = el("button", "sd2-btn", "⚙ 服务配置");
+    cfgBtn.title = "LLM 与生图服务的端点/密钥：魔法棒对话改写与 AI 自动创作"
+        + "共用的项目 agent 都走这份配置（存服务端，不随工作流外泄）";
+    cfgBtn.addEventListener("click", () => ed.config?.open());
+    bar.appendChild(cfgBtn);
     const addBtn = el("button", "sd2-btn primary", "+ 分镜");
     addBtn.addEventListener("click", () => {
         const s = ed.store.get();
