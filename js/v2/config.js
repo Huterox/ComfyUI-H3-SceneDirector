@@ -83,9 +83,9 @@ export function createConfig(ed, { api }) {
         s1.appendChild(el("div", "ttl", "LLM（故事 / 提示词写作模型）"));
         const fmt = select([["OpenAI 兼容", "openai"], ["Anthropic", "anthropic"]],
             llm.api_format || "openai");
-        const base = text(llm.base_url, "https://api.anthropic.com / http://127.0.0.1:11434/v1");
-        const key = text(llm.api_key, "sk-...", "password");
-        const model = text(llm.model, "claude-sonnet-4-5 / qwen3 等");
+        const base = text(llm.base_url, "https://api.openai.com/v1");
+        const key = text(llm.api_key, "sk-…", "password");
+        const model = text(llm.model, "如 claude-sonnet-4-5 / qwen3-32b");
         const ctx = text(llm.context_window ?? 200000, "200000", "number");
         ctx.title = "会话接近上下文窗口时，由 pi-agent-core compaction 自动摘要压缩";
         s1.appendChild(field("API 格式", fmt));
@@ -119,6 +119,13 @@ export function createConfig(ed, { api }) {
         const testImg = el("button", "sd2-btn sm", "测试连接");
         sizeRow.appendChild(testImg);
         s2.appendChild(sizeRow);
+        // 厂商=不启用时生图区字段全部禁用（免得以为配了就会生效）
+        const syncImgDisabled = () => {
+            const off = prov.value === "disabled";
+            for (const w of [ibase, ikey, isize, testImg]) w.disabled = off;
+        };
+        prov.addEventListener("change", syncImgDisabled);
+        syncImgDisabled();
         s2.appendChild(el("div", "note",
             "Seedream：OpenAI 兼容 images 接口，多图参考 + 图像编辑，便宜直连（主力）；"
             + "nanobanana：角色一致性/改角度最强（正/侧/背三视图），走中转（精修）。"));

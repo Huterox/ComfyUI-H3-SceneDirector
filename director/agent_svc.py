@@ -370,7 +370,7 @@ def get_project_agent(project, cfg=None):
     cfg = cfg or studio.load_config()
     llm = cfg.get("llm") or {}
     if not llm.get("base_url") or not llm.get("model"):
-        raise RuntimeError("LLM 未配置：点全局设置区右上角「服务配置」填 Base URL / 模型 / Key")
+        raise RuntimeError("LLM 未配置：点「⚙ 服务配置」（工作台全局设置区头部 / AI 自动创作视图头部都有入口）填 Base URL / 模型 / Key")
     fp = _config_fingerprint(cfg)
     cached = _AGENTS.get(project)
     if cached and cached.fingerprint == fp:

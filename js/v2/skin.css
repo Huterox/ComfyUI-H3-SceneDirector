@@ -443,6 +443,7 @@
     border-radius: 4px; padding: 4px 12px; cursor: pointer; }
 .sd2-cfg .sd2-btn:hover { background: #2b3040; }
 .sd2-cfg .sd2-btn.primary { background: #2e6fd8; border-color: #2e6fd8; color: #fff; }
+.sd2-cfg .sd2-inp:disabled, .sd2-cfg .sd2-btn:disabled { opacity: .45; cursor: default; }
 .sd2-cfg .sp { flex: 1; }
 
 /* 魔法棒错误预览块 */
