@@ -508,6 +508,9 @@
     display: flex; flex-direction: column;
     background: #10141f; border: 1px solid #2c3b6e; border-radius: 10px;
     overflow: hidden; }
+/* display:flex 会压过 [hidden] 的 UA 样式，关掉时必须显式藏（不然关闭后
+   面板仍以 flex:1 占掉半个节点高度，页面看起来"空白了一块"） */
+.mmx-host .sd2-ap[hidden] { display: none !important; }
 .sd2-ap-hd { display: flex; align-items: center; gap: 10px; padding: 10px 14px;
     background: #151b2c; border-bottom: 1px solid #24305a; }
 .sd2-ap-hd b { font-size: 14px; }
