@@ -153,6 +153,7 @@ function buildSkeleton(ed) {
         b.dataset.task = key;
         b.title = label;
         b.addEventListener("click", () => {
+            ed.autopilot?.close();      // 从 AI 视图切回模式内容（无开无操作）
             if (ed.store.mode() === key) return;
             ed.store.setMode(key);      // 每模式独立数据舱：收起当前、切出目标
             ed.selectedIndex = 0;
@@ -182,8 +183,12 @@ function buildSkeleton(ed) {
     bar.appendChild(sum);
     bar.appendChild(el("span", "sp"));
     const aiBtn = el("button", "sd2-btn ai", "✨ AI 自动创作");
-    aiBtn.title = "从一句话想法到整条分镜：agent 自动规划/生图/写提示词";
-    aiBtn.addEventListener("click", () => ed.autopilot?.open());
+    aiBtn.title = "从一句话想法到整条分镜：agent 自动规划/生图/写提示词"
+        + "（与模式页签同级的一个内容舱，再点一次切回）";
+    aiBtn.addEventListener("click", () => {
+        if (ed.autopilot?.isOpen) ed.autopilot.close();
+        else ed.autopilot?.open();
+    });
     bar.appendChild(aiBtn);
     const addBtn = el("button", "sd2-btn primary", "+ 分镜");
     addBtn.addEventListener("click", () => {

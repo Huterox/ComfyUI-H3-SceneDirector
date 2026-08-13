@@ -1,12 +1,12 @@
-// autopilot.js —— AI 自动创作抽屉（body 挂载 overlay，契约作用域外故意，
-// 与 config.js/lightbox 同款）。
+// autopilot.js —— AI 自动创作视图（内嵌工作台，与 t2v/i2v 模式页签同级的
+// 一个"内容舱"：点 ✨ 切进来，点模式页签或 × 切回去，契约 16）。
 //
 // 数据流：
 //   开始 → POST /agent/autoplan（带当前工作台快照）→ 轮询 /autoplan/status
 //   对话 → POST /agent/autoplan/reply（挂起回答/追改）
 //   放弃 → POST /agent/autoplan/cancel
 //   应用 → status.draft 落进 store（全量覆盖当前模式舱）→ 自动存项目并切换
-// 会话按项目绑定：关掉抽屉再开，步骤流与对话都在（服务端 SQLite）。
+// 会话按项目绑定：切走再切回，步骤流与对话都在（服务端 SQLite）。
 import { el, refThumbURL, lightbox } from "./util.js";
 
 export function createAutopilot(ed, { api }) {
@@ -294,14 +294,11 @@ export function createAutopilot(ed, { api }) {
     // --- 开合 -----------------------------------------------------------------
 
     function build() {
-        // 抽屉挂 body，但皮肤变量与组件样式都定义在 .mmx-host .sd2 作用域下：
-        // 遮罩带 mmx-host、面板带 sd2，把抽屉接回同一套皮肤（契约 16）
-        overlay = el("div", "sd2-ap-mask mmx-host");
-        const panel = el("div", "sd2 sd2-ap");
-        overlay.appendChild(panel);
-        overlay.addEventListener("pointerdown", (e) => {
-            if (e.target === overlay) close();
-        });
+        // 内嵌面板：挂进工作台根容器，靠根容器 sd2-ap-open class 切显隐。
+        // 变量名沿用 overlay，实为根容器的一个子视图（不再是 body 浮层）
+        overlay = el("div", "sd2-ap");
+        overlay.hidden = true;   // 用 hidden 属性切显隐（"hidden" 类名在皮肤里另有含义，不能用）
+        const panel = overlay;
 
         // 头
         const hd = el("div", "sd2-ap-hd");
@@ -375,7 +372,7 @@ export function createAutopilot(ed, { api }) {
         ft.appendChild(applyBtn);
         panel.appendChild(ft);
 
-        document.body.appendChild(overlay);
+        ed.els.root.appendChild(overlay);
     }
 
     async function tick() {
@@ -385,30 +382,43 @@ export function createAutopilot(ed, { api }) {
         render();
     }
 
+    function setAiBtn(on) {
+        ed.els.root?.querySelector(".sd2-btn.ai")?.classList.toggle("on", !!on);
+    }
+
     function open() {
-        if (overlay) return;
+        if (!overlay) build();
+        if (!overlay.hidden) return;      // 已在 AI 视图
         snap = { status: "idle", steps: [] };
         chatLog = [];
         chatLoaded = false;
-        build();
+        ed.els.root.classList.add("sd2-ap-open");   // 隐藏普通模式内容（CSS）
+        overlay.hidden = false;
+        setAiBtn(true);
         (async () => {
             await fetchStatus();
             await fetchChat();
             if (snap.idea) overlay.querySelector(".sd2-ap-idea").value = snap.idea;
             render();
         })();
+        clearInterval(pollTimer);
         pollTimer = setInterval(tick, 1600);
     }
 
     function close() {
         clearInterval(pollTimer);
         pollTimer = 0;
+        ed.els.root?.classList.remove("sd2-ap-open");
+        setAiBtn(false);
+        if (overlay) overlay.hidden = true;
+    }
+
+    function dispose() {
+        close();
         overlay?.remove();
         overlay = null;
     }
 
-    function dispose() { close(); }
-
     return { open, close, dispose,
-             get isOpen() { return !!overlay; } };
+             get isOpen() { return !!(overlay && !overlay.hidden); } };
 }

@@ -500,13 +500,14 @@
     padding: 4px 16px; cursor: pointer; }
 .mmx-host .sd2-chat-in .go:hover { filter: brightness(1.15); }
 
-/* ===== AI 自动创作抽屉（autopilot.js，body 挂载；遮罩带 mmx-host、面板带 sd2 接回皮肤作用域） ===== */
-.sd2-ap-mask { position: fixed; inset: 0; background: rgba(4, 6, 12, 0.72);
-    z-index: 900; display: flex; align-items: center; justify-content: center; }
-.mmx-host .sd2-ap { width: min(1060px, 92vw); height: min(760px, 88vh);
-    gap: 0;  /* 抵消 .sd2 的 8px 子间距，抽屉各节自带 padding */
+/* ===== AI 自动创作视图（autopilot.js，内嵌工作台：与模式页签同级的内容舱） ===== */
+/* 打开时藏掉普通模式内容，只留工具条与 AI 视图 */
+.mmx-host .sd2.sd2-ap-open > :not(.sd2-bar):not(.sd2-ap) { display: none !important; }
+.mmx-host .sd2-btn.ai.on { box-shadow: 0 0 0 1px var(--accent) inset, 0 0 10px rgba(77, 163, 255, .35); }
+.mmx-host .sd2-ap { flex: 1; min-height: 0; width: 100%;
+    display: flex; flex-direction: column;
     background: #10141f; border: 1px solid #2c3b6e; border-radius: 10px;
-    overflow: hidden; box-shadow: 0 12px 48px rgba(0, 0, 0, 0.55); }
+    overflow: hidden; }
 .sd2-ap-hd { display: flex; align-items: center; gap: 10px; padding: 10px 14px;
     background: #151b2c; border-bottom: 1px solid #24305a; }
 .sd2-ap-hd b { font-size: 14px; }
@@ -567,7 +568,7 @@
     font-size: 10px; }
 
 .sd2-ap-chat { border-top: 1px solid #1d2540; padding: 8px 14px 10px; }
-.sd2-ap-chatlog { height: 110px; overflow-y: auto; display: flex;
+.sd2-ap-chatlog { height: 150px; overflow-y: auto; display: flex;
     flex-direction: column; gap: 8px; padding: 4px 2px 8px; }
 .sd2-ap-ft { display: flex; align-items: center; gap: 10px; padding: 10px 14px;
     background: #151b2c; border-top: 1px solid #24305a; }
