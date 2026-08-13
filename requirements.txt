@@ -1,0 +1,8 @@
+# SceneDirector 项目 agent 的第三方运行时依赖（pi 运行时本体已 vendored
+# 在 vendor/ 内，无需 pip；下列仅为它依赖的通用库）
+pydantic>=2.7
+openai>=1.50
+anthropic>=0.39
+json-repair>=0.30
+python-dotenv>=1.0
+pyyaml>=6

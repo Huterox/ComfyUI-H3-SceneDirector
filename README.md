@@ -116,7 +116,13 @@ r2v 公共参考面板（图/音/视分类）：
 
 ## 快速开始
 
-1. 把本包放进 `ComfyUI/custom_nodes/`，重启 ComfyUI
+1. 把本包放进 `ComfyUI/custom_nodes/`，装依赖（agent 用的通用库；
+   pi 运行时本体已 vendored 在包内 `vendor/`，不用装），重启 ComfyUI：
+
+   ```bash
+   pip install -r requirements.txt
+   ```
+
 2. 准备模型：
 
 | 用途 | 文件 | 目录 |
@@ -189,9 +195,12 @@ SceneDirector 的解法是**把上一段的"结尾状态"变成下一段的"已�
   工作台的产品形态）；
 - 算法思路参考 [ComfyUI-H3-Motion-Context] 项目（运动上下文 / 特征上下文
   窗口衔接的问题定义与思路启发）。
+- 项目 agent 运行时 vendored 自 [pi-py]（`pi_ai` / `pi_agent_core` /
+  `pi_storage_sqlite` @0.83.0，MIT，作者 Justin Gao），随包携带于
+  `vendor/`（附 `LICENSE.pi-py`），免 pip 安装。
 
 本项目的全部代码（前端 v2、衔接内核 `core/`、工程层 `director/`）均为独立
-实现，未搬运上述项目的源码。
+实现，未搬运上述两个参考项目的源码。
 
 ## 许可证
 

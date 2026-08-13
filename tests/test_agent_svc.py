@@ -10,6 +10,7 @@ import sys
 import tempfile
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "vendor"))  # vendored pi 运行时
 
 from pi_ai.providers.faux import FAUX_MODEL, FauxScript, clear_scripts, push_script
 from pi_agent_core.harness.session import InMemorySessionStorage, Session
