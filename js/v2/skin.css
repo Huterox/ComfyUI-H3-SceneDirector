@@ -500,13 +500,13 @@
     padding: 4px 16px; cursor: pointer; }
 .mmx-host .sd2-chat-in .go:hover { filter: brightness(1.15); }
 
-/* ===== AI 自动创作抽屉（autopilot.js，body 挂载） ===== */
+/* ===== AI 自动创作抽屉（autopilot.js，body 挂载；遮罩带 mmx-host、面板带 sd2 接回皮肤作用域） ===== */
 .sd2-ap-mask { position: fixed; inset: 0; background: rgba(4, 6, 12, 0.72);
     z-index: 900; display: flex; align-items: center; justify-content: center; }
-.sd2-ap { width: min(1060px, 92vw); height: min(760px, 88vh);
+.mmx-host .sd2-ap { width: min(1060px, 92vw); height: min(760px, 88vh);
+    gap: 0;  /* 抵消 .sd2 的 8px 子间距，抽屉各节自带 padding */
     background: #10141f; border: 1px solid #2c3b6e; border-radius: 10px;
-    display: flex; flex-direction: column; overflow: hidden;
-    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.55); color: #dde2f0; font-size: 12px; }
+    overflow: hidden; box-shadow: 0 12px 48px rgba(0, 0, 0, 0.55); }
 .sd2-ap-hd { display: flex; align-items: center; gap: 10px; padding: 10px 14px;
     background: #151b2c; border-bottom: 1px solid #24305a; }
 .sd2-ap-hd b { font-size: 14px; }
@@ -569,18 +569,10 @@
 .sd2-ap-chat { border-top: 1px solid #1d2540; padding: 8px 14px 10px; }
 .sd2-ap-chatlog { height: 110px; overflow-y: auto; display: flex;
     flex-direction: column; gap: 8px; padding: 4px 2px 8px; }
-.sd2-ap-chatlog .sd2-chat-msg { max-width: 82%; }
 .sd2-ap-ft { display: flex; align-items: center; gap: 10px; padding: 10px 14px;
     background: #151b2c; border-top: 1px solid #24305a; }
 .sd2-ap-ft .meta { color: #8a92ad; font-size: 10px; }
 .sd2-ap-ft .sp { flex: 1; }
 .sd2-ap-ft .sd2-ap-apply:disabled { opacity: 0.45; cursor: default; }
 
-/* 抽屉内的对话气泡（.mmx-host 作用域外，需自带样式） */
-.sd2-ap .sd2-chat-msg { max-width: 82%; font-size: 12px; line-height: 1.6; }
-.sd2-ap .sd2-chat-msg .tx { white-space: pre-wrap; word-break: break-word; }
-.sd2-ap .sd2-chat-msg.agent { align-self: flex-start; color: #dde2f0; }
-.sd2-ap .sd2-chat-msg.agent.wait { color: #8a92ad; font-size: 11px; }
-.sd2-ap .sd2-chat-msg.user { align-self: flex-end; background: #2456c9; color: #eaf0ff;
-    border-radius: 10px 10px 2px 10px; padding: 6px 12px; }
-.sd2-ap .sd2-chat-msg.err { align-self: flex-start; color: #e07070; font-size: 11px; }
+/* 对话气泡 / 输入行直接吃宿主皮肤（.mmx-host .sd2-chat-*），不再自带重复样式 */

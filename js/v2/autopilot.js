@@ -294,8 +294,10 @@ export function createAutopilot(ed, { api }) {
     // --- 开合 -----------------------------------------------------------------
 
     function build() {
-        overlay = el("div", "sd2-ap-mask");
-        const panel = el("div", "sd2-ap");
+        // 抽屉挂 body，但皮肤变量与组件样式都定义在 .mmx-host .sd2 作用域下：
+        // 遮罩带 mmx-host、面板带 sd2，把抽屉接回同一套皮肤（契约 16）
+        overlay = el("div", "sd2-ap-mask mmx-host");
+        const panel = el("div", "sd2 sd2-ap");
         overlay.appendChild(panel);
         overlay.addEventListener("pointerdown", (e) => {
             if (e.target === overlay) close();
