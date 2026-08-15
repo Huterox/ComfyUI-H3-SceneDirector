@@ -4,9 +4,10 @@
 决策，多段串联后累积成肉眼可见的变暗/变色（中性灰底场景尤其明显）。
 match/match_smooth 做整段统计校色——只修交付像素，不动内容、不动 latent。
 
-缝（接口不跳）：opening_luma_blend 把本段开头几帧亮度向上一段尾巴
-渐变对齐；seam_echo_count 做接缝回声诊断。这一层与 Director 的
-"引导帧亮度归一/开头混合"同思路，是我们的自研互补实现。
+缝（接口不跳）：opening_luma_blend 把本段开头若干帧的亮度以加性等值
+位移向上一段尾巴渐变对齐（乘性增益会造成亮度泵，Director 实测结论）；
+seam_echo_count 做接缝回声诊断。这一层与 Director 的接缝处理同思路，
+是我们的自研互补实现。
 
 适合锁机位、恒定光照的片子（口播、装配）；光照需要渐变的片子
 （比如结尾要破晓）请关闭 color_lock，否则渐变会被抹平。
@@ -95,29 +96,36 @@ def luma_match(images, ref_luma, ratio_clamp=(0.55, 1.8)):
     return (images * ratio).clamp(0.0, 1.0)
 
 
-def opening_luma_blend(images, prev_tail, k=4, strength=0.85, ratio_clamp=(0.8, 1.25)):
-    """开头亮度向上一段尾巴渐变对齐：本段前 k 帧按线性衰减权重把亮度
-    拉向上一段末帧亮度，只调亮度不改内容。
+def opening_luma_blend(images, prev_tail, k=12, max_delta=0.10, trigger=0.02):
+    """开头亮度向上一段尾巴渐变对齐——加性等值位移版。
 
-    images: [T,H,W,C] 本段交付帧；prev_tail: [N,H,W,C] 上一段交付尾部
-    （至少 1 帧）。接缝两侧内容由 latent 钉帧保证连续，这里只消除
-    亮度层面的跳变。
+    Director 的迭代结论：乘性 fading gain（逐帧按比率缩放）会在接缝后
+    形成亮度泵（一闪一闪）；把亮度差折算成全通道等值 delta 加上去，
+    只动亮度、不压局部对比度，也就没有拖影。这里按同思路自研：
+
+    前 k 帧的平均亮度从 prev_tail[-1] 线性缓到 images[k]，每帧加
+    同一个 RGB delta（封顶 ±max_delta）；接缝本来就很顺滑（两端差值
+    都小于 trigger）时原样不动。
     """
-    if prev_tail is None or int(prev_tail.shape[0]) < 1 or int(images.shape[0]) < 1:
+    if prev_tail is None or int(prev_tail.shape[0]) < 1:
         return images
-    target = float(_luma(prev_tail[-1]).mean().item())
-    target = max(target, 1e-4)
+    n = min(int(k), int(images.shape[0]) - 1)
+    if n < 2:
+        return images
+    y_start = float(_luma(prev_tail[-1]).mean().item())
+    y0 = float(_luma(images[0]).mean().item())
+    y_end = float(_luma(images[n]).mean().item())
+    if abs(y0 - y_start) < trigger and abs(y_end - y_start) < trigger:
+        return images
     out = images.clone()
-    n = min(int(k), int(out.shape[0]))
     for i in range(n):
+        t = float(i) / float(n)
+        target = y_start * (1.0 - t) + y_end * t
         cur = float(_luma(out[i]).mean().item())
-        if cur < 1e-4:
+        delta = max(-float(max_delta), min(float(max_delta), target - cur))
+        if abs(delta) < 1e-5:
             continue
-        ratio = target / cur
-        lo, hi = ratio_clamp
-        ratio = max(lo, min(hi, ratio))
-        w = strength * (n - i) / n
-        out[i] = (out[i] * (1.0 + (ratio - 1.0) * w)).clamp(0.0, 1.0)
+        out[i] = (out[i].float() + delta).clamp(0.0, 1.0).to(dtype=out.dtype)
     return out
 
 

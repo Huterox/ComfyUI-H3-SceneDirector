@@ -222,7 +222,11 @@ def parse_payload(raw):
                "enabled": bool(item.get("enabled", True)),
                "first_frame": _norm_frame_ref(item.get("first_frame")),
                "last_frame": _norm_frame_ref(item.get("last_frame")),
-               "source": _norm_source(item.get("source"))}
+               "source": _norm_source(item.get("source")),
+               # 上游（parse_director）已定好任务模式时原样保留——丢了会让
+               # infer_task 重新猜，而常驻卡按设计不入推断，r2v 会被误判成
+               # t2v（meta/日志/缓存哈希口径全跟着错）
+               "task": str(item.get("task", "") or "").strip().lower()}
         am = str(item.get("audio_mode", "") or "").strip().lower()
         seg["audio_mode"] = am if am in AUDIO_MODES else "generate"
         seg["task"] = infer_task(seg, assets)
