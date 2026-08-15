@@ -39,6 +39,10 @@ function defaultState(taskLabel) {
                   continuityEnabled: true, continuityOverlapFrames: 22,
                   audioMode: "generate", exportMode: "all",
                   colorLock: false, lumaLock: false,
+                  // 链条 seed：-1 = 沿用缓存 meta/随机；>=0 钉死并随全局指纹
+                  // 生效。由 main.js 的 pushSeed 同步到图里 Chain 节点的
+                  // seed widget（引擎只认那个 widget），随项目/工作流保存。
+                  seed: -1,
                   // 模型联动（输出条可配，随工作流保存）
                   modelGen: "minimax_h3_fl2va_pruned_int8_convrot.safetensors",
                   modelRef: "minimax_h3_ref2va_pruned_int8_convrot.safetensors" },
@@ -373,6 +377,9 @@ export function createStore({ node, app, api }) {
                          kind: c.kind || "image", pinned: c.pinned !== false };
             }).filter((a) => a.image || a.name || a.note);
             const globalTask = taskKeyFromLabel(g.taskType || taskW?.value);
+            // 显式 seed 入引擎全局指纹：带给 /status 做"全局变了"判定（-1 不算变）
+            let seedV = Math.trunc(Number(tl.output?.seed));
+            if (!Number.isFinite(seedV) || seedV < -1) seedV = -1;
 
             const rows = [];
             const shots = tl.shots || [];
@@ -412,6 +419,7 @@ export function createStore({ node, app, api }) {
                 globals: [],
                 assets,
                 segments: rows,
+                seed: seedV,
             };
         },
 

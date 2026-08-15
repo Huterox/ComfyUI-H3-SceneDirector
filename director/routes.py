@@ -336,13 +336,22 @@ async def status(request):
     global_prompt = str(body.get("global_prompt", "") or "").strip()
     globals_rows = P.norm_globals(body.get("globals"))
     norm_assets = P.norm_assets(body.get("assets"))
+    # 显式 seed（>=0）入引擎全局指纹：和 meta.base_seed 不一致就是全局变了；
+    # -1 沿用 meta，永远不算变
+    try:
+        seed_v = int(body.get("seed", -1))
+    except (TypeError, ValueError):
+        seed_v = -1
+    seed_changed = seed_v >= 0 and bool(meta) \
+        and int(meta.get("base_seed", -1)) != seed_v
     # v5 口径：只有常驻卡的变化算"全局变了"；按需卡经由段 refs 指纹
     # 只级联引用它的段（与引擎 g_hash/seg_hash 的判定保持一致）
     afp = P.assets_fp(P.pinned_assets(norm_assets))
     global_changed = bool(meta) and (
         (meta.get("global_prompt") or "") != global_prompt
         or (meta.get("globals") or []) != globals_rows
-        or (meta.get("assets_fp") or []) != afp)
+        or (meta.get("assets_fp") or []) != afp
+        or seed_changed)
     statuses = []
     first_dirty = 0 if global_changed else None
     for i, row in enumerate(rows):

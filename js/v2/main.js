@@ -92,6 +92,24 @@ function pushResolution(ed) {
     } catch (e) { /* 联动失败不影响编辑 */ }
 }
 
+// 输出条 seed -> 图里 Chain 节点的 seed widget（引擎只从那里读）。
+// 顺带把控件钉成 fixed：randomize 会让宿主每次跑完改 seed，显式 seed
+// 又进全局指纹——那是"每次运行 0 缓存全链重渲"事故的组合拳。
+function pushSeed(ed) {
+    try {
+        const chain = (app.graph?._nodes || [])
+            .find((n) => n.comfyClass === "H3SceneDirectorChain");
+        const seedW = chain?.widgets?.find((w) => w.name === "seed");
+        if (!seedW) return;
+        let v = Math.trunc(Number(ed.store.get().output?.seed));
+        if (!Number.isFinite(v) || v < -1) v = -1;
+        if (seedW.value !== v) seedW.value = v;
+        const ctlW = chain.widgets?.find((w) => w.name === "control_after_generate"
+            || ["fixed", "increment", "decrement", "randomize"].includes(w.value));
+        if (ctlW) ctlW.value = "fixed";
+    } catch (e) { /* 找不到链条节点就只存时间线 */ }
+}
+
 // 两个模型位由输出条的「模型联动」下拉配置，随工作流保存（output.modelGen/modelRef）。
 function linkModel(node, modeKey, store) {
     try {
@@ -213,18 +231,10 @@ function buildSkeleton(ed) {
         const s = ed.store.get();
         for (const seg of s.segments) seg.id = ed.store.newSegment().id;
         for (const sh of s.shots) sh.id = ed.store.newShot().id;
-        // 链内同 seed 之后，重摇必须换噪声才有意义：把图里链条节点的
-        // seed 掷成新随机值并钉住（>=0 的 seed 会进全局指纹，缓存自然全灭；
-        // fixed 防止宿主每次跑完又自动改值把缓存冲掉）
-        try {
-            const chain = (app.graph?._nodes || [])
-                .find((n) => n.comfyClass === "H3SceneDirectorChain");
-            const seedW = chain?.widgets?.find((w) => w.name === "seed");
-            if (seedW) seedW.value = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
-            const ctlW = chain?.widgets?.find((w) => w.name === "control_after_generate"
-                || ["fixed", "increment", "decrement", "randomize"].includes(w.value));
-            if (ctlW) ctlW.value = "fixed";
-        } catch (e) { /* 找不到链条节点就只换 id */ }
+        // 链内同 seed 之后，重摇必须换噪声才有意义：掷新 seed 进状态
+        // （commit 的订阅链会把它推到 Chain 节点 widget；>=0 进全局
+        // 指纹，缓存自然全灭）
+        s.output.seed = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
         ed.store.commit({ structural: true });
     });
     const selBtn = el("button", "sd2-btn", "选择运行");
@@ -426,6 +436,21 @@ function buildSkeleton(ed) {
         ed.store.commit();
     });
     out.appendChild(ctxN);
+    out.appendChild(el("span", "lbl", "Seed"));
+    const seedInp = el("input", "sd2-inp num");
+    seedInp.type = "number"; seedInp.min = "-1"; seedInp.step = "1";
+    seedInp.value = o().seed ?? -1;
+    seedInp.title = "链条噪声种子：-1 = 沿用缓存/随机（推荐，缓存稳）；"
+        + ">=0 = 整条链钉死这个种子（链内各段同 seed，改它会全链重渲）";
+    seedInp.addEventListener("change", () => {
+        let v = Math.trunc(Number(seedInp.value));
+        if (!Number.isFinite(v) || v < -1) v = -1;
+        o().seed = v;
+        seedInp.value = v;
+        ed.store.commit();
+        pushSeed(ed);
+    });
+    out.appendChild(seedInp);
     out.appendChild(el("span", "lbl", "声音"));
     const au = el("select", "sd2-inp");
     au.appendChild(new Option("生成声音", "generate"));
@@ -476,7 +501,7 @@ function buildSkeleton(ed) {
 
     return { root, bar, tabs, projSel, newBtn, saveBtn, saveAsBtn, delProjBtn, aiBtn, sum,
              addBtn, rerollBtn, selBtn, live, globalArea, main, out, asp, mp, fps,
-             cont, ctxN, au, exp, refreshProjects };
+             cont, ctxN, au, exp, seedInp, refreshProjects };
 }
 
 function initEditor(node) {
@@ -526,6 +551,10 @@ function initEditor(node) {
             + ":" + String(Math.floor(total % 60)).padStart(2, "0")
             + (cached != null ? " · 已缓存 " + cached + "/" + segs.length : "");
         ed.els.selBtn.classList.toggle("active", !!s.runSelectEnabled);
+        // seed 输入框跟状态走（外部 reload/项目切换后显示不脱节；打字中不抢）
+        if (ed.els.seedInp && document.activeElement !== ed.els.seedInp) {
+            ed.els.seedInp.value = s.output?.seed ?? -1;
+        }
         ed.selectedIndex = Math.max(0, Math.min(ed.selectedIndex, segs.length - 1));
 
         // 全局设置区（资产库）+ 主区
@@ -536,6 +565,24 @@ function initEditor(node) {
     };
 
     store.subscribe((info) => { if (info.structural) ed.render(); });
+    store.subscribe(() => pushSeed(ed));   // 任何 commit 后把 seed 推到 Chain 节点
+
+    // 旧档迁移：时间线里还没有 seed 键时，采纳 Chain 节点 widget 上的现值
+    // （比如手动钉的 42），而不是用默认 -1 把它冲掉
+    try {
+        const raw = JSON.parse(store.tlWidget()?.value || "{}");
+        if (!raw.output || !("seed" in raw.output)) {
+            const chain = (app.graph?._nodes || [])
+                .find((n) => n.comfyClass === "H3SceneDirectorChain");
+            const w = chain?.widgets?.find((x) => x.name === "seed");
+            const v = Math.trunc(Number(w?.value));
+            if (w && Number.isFinite(v)) {
+                store.get().output.seed = v;
+                store.commit();   // 落进时间线，订阅链顺手推到 Chain widget
+            }
+        }
+    } catch (e) { /* 解析失败不管 */ }
+    pushSeed(ed);
 
     // widget 值外部恢复（工作流加载/撤销重做）；
     // commit 自己写回时 callback 也会触发——用 isWriting 挡住，不然每次击键
