@@ -126,29 +126,6 @@ def _concat_audio(a, b):
             "sample_rate": a["sample_rate"]}
 
 
-def _mute_head(audio, seconds=0.15):
-    """静掉第 1 段音频开头的起音爆音（实测在 20~140ms，响度接近人声）。
-
-    后续段的头部都被钉帧 + trim 裁掉（约 1.6s），不会暴露这条音频流的
-    原始起始边界；只有第 1 段从 t=0 开始交付，爆音才听得见。语音实际
-    开始远在 1s 之后，静音 150ms 不损失内容；切口后接 20ms 余弦缓入，
-    避免静音切口本身变成新的咔哒。
-    """
-    sr = int(audio["sample_rate"])
-    wav = audio["waveform"]
-    n = min(int(round(seconds * sr)), int(wav.shape[-1]) - 64)
-    if n <= 0:
-        return audio
-    out = wav.clone()
-    out[..., :n] = 0.0
-    fade = min(int(round(0.02 * sr)), int(out.shape[-1]) - n)
-    if fade > 0:
-        t = torch.linspace(0.0, 1.0, fade, device=out.device, dtype=out.dtype)
-        ramp = 0.5 - 0.5 * torch.cos(t * torch.pi)
-        out[..., n:n + fade] = out[..., n:n + fade] * ramp
-    return {"waveform": out, "sample_rate": sr}
-
-
 # ---------------------------------------------------------------------------
 # 编码路径（编码头节点调用）
 # ---------------------------------------------------------------------------
@@ -588,10 +565,6 @@ def _run_chain_impl(model, vae, audio_vae, segments_raw, story_cond, sampler,
             VRAM.cleanup_segment_vram(vram_cleanup)
 
         out_imgs, out_aud = delivered_view(imgs, aud, trim, seg["duration"])
-        if i == 0 and out_aud is not None:
-            # 只有第 1 段暴露音频流原始起点（后续段头部被钉帧裁掉），
-            # 起音爆音静掉，交付和缓存都是干净的
-            out_aud = _mute_head(out_aud)
 
         # v2v 声音模式：original = 源片段原声；mute = 静音（采样率对齐生成流，
         # 否则拼接时音高/时长全错）
