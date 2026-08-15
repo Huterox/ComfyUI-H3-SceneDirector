@@ -488,7 +488,12 @@ def _run_chain_impl(model, vae, audio_vae, segments_raw, story_cond, sampler,
                           0, steps_total, i * steps_total,
                           len(segs) * steps_total,
                           partial=n_cached > 0)
-            seg_seed = (base_seed + i) & 0xffffffffffffffff
+            # 链内同 seed：钉帧窗口只压得住段首约 1s，窗口之后的自由区域
+            # （背景、色调等未被参考锚定的部分）按初始噪声采样——各段共享同
+            # 一片噪声场，自由区域的色彩/质地倾向一致，段间漂移显著收敛。
+            # 想换一条新片子用前端的"全部重摇"（它会把链条节点的 seed
+            # 掷成新值），而不是靠段序号派生。
+            seg_seed = base_seed
 
             def _live(step, total_steps, img, _i=i):
                 # 逐步实时预览：投影小图放大到顺手尺寸，JPEG base64 推给工作台
@@ -572,7 +577,8 @@ def _run_chain_impl(model, vae, audio_vae, segments_raw, story_cond, sampler,
         all_images.append(out_imgs)
         all_audio = _concat_audio(all_audio, out_aud)
 
-        seg_seed = (base_seed + i) & 0xffffffffffffffff
+        # meta 里记实际生效的段 seed（链内同 seed，见采样处注释）
+        seg_seed = base_seed
         frames = int(out_imgs.shape[0])
         wav_s = int(out_aud["waveform"].shape[-1])
         drift = abs(frames / float(P.FPS) - wav_s / int(out_aud["sample_rate"])) * 1000.0

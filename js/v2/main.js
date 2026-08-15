@@ -207,11 +207,24 @@ function buildSkeleton(ed) {
         ed.store.commit({ structural: true });
     });
     const rerollBtn = el("button", "sd2-btn", "全部重摇");
-    rerollBtn.title = "所有段换新 id：整条链缓存作废，下次全量重渲";
+    rerollBtn.title = "所有段换新 id + 链条 seed 掷新值：缓存作废、噪声换新，"
+        + "下次全量重渲出真正不同的片子";
     rerollBtn.addEventListener("click", () => {
         const s = ed.store.get();
         for (const seg of s.segments) seg.id = ed.store.newSegment().id;
         for (const sh of s.shots) sh.id = ed.store.newShot().id;
+        // 链内同 seed 之后，重摇必须换噪声才有意义：把图里链条节点的
+        // seed 掷成新随机值并钉住（>=0 的 seed 会进全局指纹，缓存自然全灭；
+        // fixed 防止宿主每次跑完又自动改值把缓存冲掉）
+        try {
+            const chain = (app.graph?._nodes || [])
+                .find((n) => n.comfyClass === "H3SceneDirectorChain");
+            const seedW = chain?.widgets?.find((w) => w.name === "seed");
+            if (seedW) seedW.value = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
+            const ctlW = chain?.widgets?.find((w) => w.name === "control_after_generate"
+                || ["fixed", "increment", "decrement", "randomize"].includes(w.value));
+            if (ctlW) ctlW.value = "fixed";
+        } catch (e) { /* 找不到链条节点就只换 id */ }
         ed.store.commit({ structural: true });
     });
     const selBtn = el("button", "sd2-btn", "选择运行");
