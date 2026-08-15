@@ -33,7 +33,7 @@ from server import PromptServer
 from comfy_extras.nodes_minimax_h3 import _empty_av_latent
 
 from ..core.motion_context import (apply_motion_context, trim_av,
-                                   VIDEO_RUN_GRID)
+                                   streams_from_av, VIDEO_RUN_GRID)
 from . import video_io
 from . import payload as P
 from . import cache as C
@@ -103,7 +103,6 @@ def decode_av(vae, audio_vae, samples):
     普通 [video, audio] 对），保证缓存段和新渲染段解码行为一致。音频分支
     对齐 comfy_extras.nodes_audio.vae_decode_audio（含其归一化）。
     """
-    from ..core.motion_context import streams_from_av
     parts = streams_from_av({"samples": samples})
     video, audio_lat = parts[0], parts[1]
     if video.ndim == 4:  # 无 batch 维的 [C,T,H,W]
@@ -412,7 +411,8 @@ def _run_chain_impl(model, vae, audio_vae, segments_raw, story_cond, sampler,
 
     all_images, all_audio = [], None
     seg_meta, info_lines = [], []
-    prev_images = prev_aud = None
+    prev_images = prev_aud = prev_latent = None
+    prev_export_end = 0   # 上一段交付末尾在其采样时间轴上的坐标（trim + 交付帧数）
 
     def delivered_view(imgs, aud, trim, duration):
         """完整渲染 -> 实际交付视图：先去钉帧头（音画同步 trim + 修尾部
@@ -433,12 +433,16 @@ def _run_chain_impl(model, vae, audio_vae, segments_raw, story_cond, sampler,
         return out_i, out_a
 
     if first_dirty > 0 and continuity:
-        # 级联点之前的最后一段提供运动上下文（用它的交付视图）
+        # 级联点之前的最后一段提供运动上下文：latent 直通钉块用它的采样
+        # latent，接缝/回退路径用它的交付视图
         pl = C.load_segment_latent(rd, first_dirty - 1)
         pi, pa = decode_av(vae, audio_vae, pl["samples"])
         prev_images, prev_aud = delivered_view(
             pi, pa, int(cached_meta[first_dirty - 1].get("trim", 0)),
             segs[first_dirty - 1]["duration"])
+        prev_latent = pl
+        prev_export_end = int(cached_meta[first_dirty - 1].get("trim", 0)) \
+            + int(prev_images.shape[0])
 
     for i, seg in enumerate(segs):
         sp = run_plan.segments[i]
@@ -447,6 +451,7 @@ def _run_chain_impl(model, vae, audio_vae, segments_raw, story_cond, sampler,
             latent = C.load_segment_latent(rd, i)
             imgs, aud = decode_av(vae, audio_vae, latent["samples"])
             trim = int(cached_meta[i].get("trim", 0))
+            cur_latent = latent
         else:
             positive = conds[i]
             if positive is None:
@@ -471,13 +476,47 @@ def _run_chain_impl(model, vae, audio_vae, segments_raw, story_cond, sampler,
             length = P.align_frame_count(want)
             latent_in, _fc = _empty_av_latent(width, height, length)
             if use_cont:
-                # 钉上一段"实际交付"的尾帧（像素）+ 交付波形（音频 VAE
-                # 路径，落点精确到交付边界），而不是完整渲染的尾巴
-                positive, trim = apply_motion_context(
+                # latent 直通：把上一段采样器输出的 AV latent 相位对齐切块
+                # 钉进本段（零重编码损耗）；prev_images/prev_aud 交付视图
+                # 仍传入，供 latent 路径不一致时回退和接缝处理使用
+                positive, trim, prev_tail_trim = apply_motion_context(
                     positive, vae, latent_in, prev_images,
                     context_length, encode_mode, anchor_mode,
                     crop, audio_context_length, audio_mode,
-                    audio_vae=audio_vae, context_audio=prev_aud)
+                    audio_vae=audio_vae, context_audio=prev_aud,
+                    context_latent=prev_latent,
+                    context_end_frame=prev_export_end)
+                if prev_tail_trim > 0:
+                    # 相位对齐让钉帧窗口提前结束：这几帧已被钉块覆盖，
+                    # 留在上一段交付尾部会在接缝回声一遍——从交付累积、
+                    # 后续锚点视图和声音里就地裁掉（段级 mp4 保持全长）
+                    keep = int(prev_images.shape[0]) - prev_tail_trim
+                    if keep >= 1:
+                        prev_images = prev_images[:keep]
+                        cut_ms = prev_tail_trim / float(P.FPS)
+                        if prev_aud is not None:
+                            sr = int(prev_aud["sample_rate"])
+                            wav = prev_aud["waveform"]
+                            cut = int(round(cut_ms * sr))
+                            if int(wav.shape[-1]) > cut:
+                                prev_aud = {"waveform": wav[..., :-cut],
+                                            "sample_rate": sr}
+                        if all_images:
+                            pi_keep = int(all_images[-1].shape[0]) - prev_tail_trim
+                            if pi_keep >= 1:
+                                all_images[-1] = all_images[-1][:pi_keep]
+                        if all_audio is not None:
+                            sr = int(all_audio["sample_rate"])
+                            wav = all_audio["waveform"]
+                            cut = int(round(cut_ms * sr))
+                            if int(wav.shape[-1]) > cut:
+                                all_audio = {"waveform": wav[..., :-cut],
+                                             "sample_rate": sr}
+                        _LOG.info("run %r 段 %d: 相位对齐，裁掉上一段交付尾部 "
+                                  "%d 帧（消除接缝回声）", run, i + 1,
+                                  prev_tail_trim)
+                        emit_log("段 %d: 上一段交付尾部裁 %d 帧（相位对齐）"
+                                 % (i + 1, prev_tail_trim))
             else:
                 trim = 0
             PromptServer.instance.send_sync(PROGRESS_EVENT, {
@@ -520,6 +559,9 @@ def _run_chain_impl(model, vae, audio_vae, segments_raw, story_cond, sampler,
             latent = _sample(model, positive, latent_in, seg_seed,
                              sampler, sigmas, negative, cfg, live=_live)
             imgs, aud = decode_av(vae, audio_vae, latent["samples"])
+            # 采样器鲜输出留一份 CPU 副本：下一段 latent 直通钉块的来源。
+            # 段 latent 约几十 MB，换 VRAM 紧张期的安全
+            cur_latent = {"samples": [t.cpu() for t in streams_from_av(latent)]}
             VRAM.cleanup_segment_vram(vram_cleanup)
 
         out_imgs, out_aud = delivered_view(imgs, aud, trim, seg["duration"])
@@ -556,6 +598,10 @@ def _run_chain_impl(model, vae, audio_vae, segments_raw, story_cond, sampler,
 
         prev_images = out_imgs
         prev_aud = out_aud
+        prev_latent = cur_latent
+        # 交付末尾在采样时间轴上的坐标：钉帧窗口只钉到这里为止，
+        # 对齐盈余（采样比交付多出的帧）不进下一段的条件
+        prev_export_end = int(trim) + int(out_imgs.shape[0])
 
         base = "seg_%04d" % (i + 1)
         if cached_hit:
